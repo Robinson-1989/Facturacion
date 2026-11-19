@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FarmaERP Multi-Sucursal | Sistema Integral Farmacéutico</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    @media print { .no-print { display: none !important; } }
+    .fade-in { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 text-slate-800 antialiased">
+  <!-- VENTANA DE LOGIN -->
+  <div id="login-screen" class="hidden min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6">
+    <div class="w-full max-w-4xl grid grid-cols-1 gap-6 rounded-3xl bg-white/10 p-6 backdrop-blur-xl ring-1 ring-white/20 md:grid-cols-12 md:p-8 shadow-2xl">
+      <!-- LADO IZQUIERDO: FORMULARIO -->
+      <div class="flex flex-col justify-center space-y-5 text-white md:col-span-5">
+        <div class="flex items-center gap-3">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-400 to-cyan-500 text-xl font-black text-slate-950 shadow-lg">Rx</div>
+          <div>
+            <h1 class="text-2xl font-black tracking-tight">FarmaERP</h1>
+            <p class="text-xs font-medium text-cyan-300">Sistema Multi-Sucursal (3 Farmacias)</p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-300">Inicia sesión con tu usuario o selecciona un acceso rápido para probar los permisos de cada rol.</p>
+
+        <form onsubmit="handleLoginForm(event)" class="space-y-3">
+          <div>
+            <label class="mb-1 block text-xs font-bold text-cyan-200">Usuario o Correo</label>
+            <input id="login-user-input" type="text" required placeholder="Ej. admin@farmaerp.com" class="w-full rounded-xl border border-white/20 bg-slate-900/70 px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:border-cyan-400 focus:outline-none">
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold text-cyan-200">Contraseña (demo: 1234)</label>
+            <input id="login-pass-input" type="password" value="1234" required class="w-full rounded-xl border border-white/20 bg-slate-900/70 px-3.5 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none">
+          </div>
+          <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-500 py-2.5 text-sm font-black text-slate-950 shadow-lg hover:opacity-95">
+            Iniciar Sesión
+          </button>
+        </form>
+      </div>
+
+      <!-- LADO DERECHO: ACCESO RÁPIDO POR USUARIO Y ROL -->
+      <div class="rounded-2xl bg-white p-5 text-slate-800 shadow-lg md:col-span-7">
+        <h2 class="mb-1 text-base font-extrabold text-slate-900">Accesos Rápidos por Rol</h2>
+        <p class="mb-4 text-xs text-slate-500">Haz clic en cualquier usuario para entrar directamente con sus permisos:</p>
+        <div id="login-quick-users" class="space-y-2.5 max-h-80 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APLICACIÓN PRINCIPAL -->
+  <div id="app-shell" class="flex min-h-screen">
+    <!-- SIDEBAR COLORIDO -->
+    <aside class="no-print hidden w-72 flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 p-5 text-white shadow-xl md:flex">
+      <div class="mb-7 flex items-center gap-3 px-1">
+        <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-400 to-cyan-500 text-lg font-black text-slate-950 shadow-lg shadow-emerald-500/30">
+          Rx
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-tight text-white">FarmaERP</h1>
+          <p class="text-xs font-medium text-cyan-300">Red de 3 Farmacias</p>
+        </div>
+      </div>
+
+      <nav id="sidebar-nav" class="flex-1 space-y-1.5"></nav>
+
+      <!-- SELECTOR DE USUARIO ACTIVO + DESCONECTAR -->
+      <div class="mt-auto space-y-3">
+        <div class="rounded-2xl border border-white/10 bg-white/10 p-3.5 backdrop-blur-sm">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">Usuario Activo</span>
+            <span id="user-role-badge" class="rounded-full px-2 py-0.5 text-[10px] font-bold"></span>
+          </div>
+          <select id="active-user-selector" class="w-full rounded-xl border border-white/20 bg-slate-800 px-2.5 py-2 text-xs font-semibold text-white focus:border-cyan-400 focus:outline-none"></select>
+          <p id="active-user-branch-hint" class="mt-2 text-[11px] text-slate-300"></p>
+        </div>
+        <button onclick="logout()" class="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-500/20 px-3 py-2.5 text-xs font-bold text-rose-200 ring-1 ring-rose-400/30 transition hover:bg-rose-500 hover:text-white">
+          🚪 Desconectarse (Ir al Login)
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="flex flex-1 flex-col">
+      <header class="no-print flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 bg-white/80 px-6 py-4 backdrop-blur-md">
+        <div>
+          <h2 id="page-title" class="text-xl font-extrabold text-slate-900">Dashboard Ejecutivo</h2>
+          <p class="text-xs text-slate-500">
+            Sesión: <span id="header-user-name" class="font-bold text-indigo-600"></span> ·
+            Rol: <span id="header-role-name" class="font-semibold text-emerald-600"></span>
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="goHome()" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-100">
+            🏠 Regresar al Inicio
+          </button>
+
+          <div class="flex items-center gap-2 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-cyan-50 px-3.5 py-2 shadow-sm">
+            <span class="text-xs font-bold uppercase tracking-wide text-indigo-700">Sucursal:</span>
+            <select id="global-branch-selector" class="bg-transparent text-sm font-bold text-slate-800 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="ALL">Vista Consolidada (3 Farmacias)</option>
+              <option value="SUC-01">Farmacia Central</option>
+              <option value="SUC-02">Farmacia Norte</option>
+              <option value="SUC-03">Farmacia Sur</option>
+            </select>
+          </div>
+
+          <button onclick="logout()" class="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-600 hover:text-white">
+            🚪 Desconectarse
+          </button>
+        </div>
+      </header>
+
+      <main id="main-content" class="fade-in flex-1 p-6"></main>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. DATOS INICIALES, ROLES Y USUARIOS
+    // ==========================================
+    const BRANCHES = [
+      { id: 'SUC-01', name: 'Farmacia Central', rnc: '130-45891-2', color: '#3b82f6' },
+      { id: 'SUC-02', name: 'Farmacia Norte', rnc: '130-45891-3', color: '#10b981' },
+      { id: 'SUC-03', name: 'Farmacia Sur', rnc: '130-45891-4', color: '#f59e0b' },
+    ];
+
+    const ALL_PERMISSIONS = [
+      { key: 'dashboard', label: 'Dashboard y Finanzas' },
+      { key: 'pos', label: 'Facturación (POS)' },
+      { key: 'inventory', label: 'Inventario y Traslados' },
+      { key: 'payroll', label: 'Nómina y Empleados' },
+      { key: 'roles', label: 'Gestión de Roles y Usuarios' },
+    ];
+
+    let ROLES = [
+      {
+        id: 'ROL-ADMIN',
+        name: 'Administrador',
+        color: 'bg-indigo-500 text-white',
+        protected: true,
+        permissions: ['dashboard', 'pos', 'inventory', 'payroll', 'roles'],
+      },
+      {
+        id: 'ROL-FACT',
+        name: 'Facturación',
+        color: 'bg-emerald-500 text-white',
+        protected: false,
+        permissions: ['pos'],
+      },
+      {
+        id: 'ROL-INV',
+        name: 'Inventario',
+        color: 'bg-amber-500 text-white',
+        protected: false,
+        permissions: ['inventory'],
+      },
+    ];
+
+    let USERS = [
+      { id: 1, name: 'Carlos Mendoza (Dueño)', email: 'admin@farmaerp.com', roleId: 'ROL-ADMIN', branchId: 'ALL' },
+      { id: 2, name: 'María Gómez', email: 'maria.pos@farmaerp.com', roleId: 'ROL-FACT', branchId: 'SUC-01' },
+      { id: 3, name: 'Luis Pérez', email: 'luis.pos@farmaerp.com', roleId: 'ROL-FACT', branchId: 'SUC-02' },
+      { id: 4, name: 'Ana Torres', email: 'ana.inv@farmaerp.com', roleId: 'ROL-INV', branchId: 'SUC-01' },
+      { id: 5, name: 'Roberto Díaz', email: 'roberto.inv@farmaerp.com', roleId: 'ROL-INV', branchId: 'SUC-03' },
+    ];
+
+    const PRODUCTS = [
+      { id: 1, barcode: '750100112233', name: 'Amoxil 500mg', active: 'Amoxicilina', pres: 'Caja x 21 Cápsulas', cost: 8.5, price: 14.9, tax: 0 },
+      { id: 2, barcode: '750100445566', name: 'Cozaar 50mg', active: 'Losartán Potásico', pres: 'Caja x 30 Tabletas', cost: 11.0, price: 19.5, tax: 0 },
+      { id: 3, barcode: '750100778899', name: 'Losec 20mg', active: 'Omeprazol', pres: 'Frasco x 28 Cápsulas', cost: 6.2, price: 12.0, tax: 0 },
+      { id: 4, barcode: '750100990011', name: 'Glucophage 850mg', active: 'Metformina', pres: 'Caja x 30 Tabletas', cost: 5.4, price: 10.5, tax: 0 },
+      { id: 5, barcode: '750100334455', name: 'Zithromax 500mg', active: 'Azitromicina', pres: 'Caja x 3 Tabletas', cost: 9.8, price: 17.0, tax: 0 },
+      { id: 6, barcode: '750100667788', name: 'Vitamina C + Zinc', active: 'Ácido Ascórbico', pres: 'Tubo x 10 Efervescentes', cost: 4.1, price: 8.9, tax: 18 },
+    ];
+
+    let LOTS = [
+      { id: 101, branchId: 'SUC-01', productId: 1, lot: 'AMX-26A', expiry: '2026-12-05', qty: 8, cost: 8.5, aisle: 'Pasillo A-2' },
+      { id: 102, branchId: 'SUC-01', productId: 1, lot: 'AMX-27B', expiry: '2027-06-15', qty: 34, cost: 8.5, aisle: 'Pasillo A-2' },
+      { id: 103, branchId: 'SUC-03', productId: 1, lot: 'AMX-27C', expiry: '2027-03-20', qty: 18, cost: 8.5, aisle: 'Pasillo A-4' },
+      { id: 201, branchId: 'SUC-01', productId: 2, lot: 'COZ-26Z', expiry: '2026-12-10', qty: 12, cost: 11.0, aisle: 'Pasillo C-1' },
+      { id: 202, branchId: 'SUC-02', productId: 2, lot: 'COZ-27M', expiry: '2027-08-10', qty: 65, cost: 11.0, aisle: 'Pasillo C-3' },
+      { id: 203, branchId: 'SUC-03', productId: 2, lot: 'COZ-27S', expiry: '2027-05-05', qty: 29, cost: 11.0, aisle: 'Pasillo B-2' },
+      { id: 301, branchId: 'SUC-01', productId: 3, lot: 'LOS-27A', expiry: '2027-09-30', qty: 85, cost: 6.2, aisle: 'Pasillo D-1' },
+      { id: 302, branchId: 'SUC-02', productId: 3, lot: 'LOS-27B', expiry: '2027-03-12', qty: 34, cost: 6.2, aisle: 'Pasillo D-2' },
+      { id: 401, branchId: 'SUC-01', productId: 4, lot: 'GLU-27A', expiry: '2027-11-01', qty: 40, cost: 5.4, aisle: 'Pasillo B-4' },
+      { id: 402, branchId: 'SUC-02', productId: 4, lot: 'GLU-27B', expiry: '2027-07-18', qty: 52, cost: 5.4, aisle: 'Pasillo B-1' },
+      { id: 403, branchId: 'SUC-03', productId: 4, lot: 'GLU-26X', expiry: '2026-12-01', qty: 9, cost: 5.4, aisle: 'Pasillo C-2' },
+      { id: 501, branchId: 'SUC-01', productId: 5, lot: 'ZIT-27A', expiry: '2027-04-22', qty: 24, cost: 9.8, aisle: 'Pasillo A-1' },
+      { id: 502, branchId: 'SUC-02', productId: 5, lot: 'ZIT-27B', expiry: '2027-05-30', qty: 19, cost: 9.8, aisle: 'Pasillo A-3' },
+      { id: 503, branchId: 'SUC-03', productId: 5, lot: 'ZIT-27C', expiry: '2027-09-14', qty: 31, cost: 9.8, aisle: 'Pasillo A-1' },
+      { id: 601, branchId: 'SUC-01', productId: 6, lot: 'VIT-27A', expiry: '2027-10-15', qty: 50, cost: 4.1, aisle: 'Mostrador E-1' },
+      { id: 602, branchId: 'SUC-02', productId: 6, lot: 'VIT-27B', expiry: '2027-08-20', qty: 28, cost: 4.1, aisle: 'Mostrador E-2' },
+      { id: 603, branchId: 'SUC-03', productId: 6, lot: 'VIT-27C', expiry: '2027-06-11', qty: 15, cost: 4.1, aisle: 'Mostrador E-1' },
+    ];
+
+    let SALES = [
+      { id: 'FAC-01-00101', date: '2026-11-13', branchId: 'SUC-01', total: 2970, cogs: 1710, lines: [{ name: 'Losec 20mg', qty: 120 }, { name: 'Amoxil 500mg', qty: 95 }] },
+      { id: 'FAC-02-00084', date: '2026-11-13', branchId: 'SUC-02', total: 2440, cogs: 1430, lines: [{ name: 'Cozaar 50mg', qty: 80 }, { name: 'Glucophage 850mg', qty: 85 }] },
+      { id: 'FAC-03-00059', date: '2026-11-14', branchId: 'SUC-03', total: 2215, cogs: 1320, lines: [{ name: 'Zithromax 500mg', qty: 75 }, { name: 'Amoxil 500mg', qty: 63 }] },
+      { id: 'FAC-01-00102', date: '2026-11-15', branchId: 'SUC-01', total: 3600, cogs: 2040, lines: [{ name: 'Cozaar 50mg', qty: 90 }, { name: 'Losec 20mg', qty: 110 }] },
+      { id: 'FAC-02-00085', date: '2026-11-15', branchId: 'SUC-02', total: 3120, cogs: 1780, lines: [{ name: 'Cozaar 50mg', qty: 110 }, { name: 'Glucophage 850mg', qty: 92 }] },
+      { id: 'FAC-03-00060', date: '2026-10-22', branchId: 'SUC-03', total: 2040, cogs: 1180, lines: [{ name: 'Zithromax 500mg', qty: 80 }] },
+    ];
+
+    const EMPLOYEES = [
+      { id: 1, branchId: 'SUC-01', name: 'Laura Méndez', pos: 'Encargada', salary: 1400 },
+      { id: 2, branchId: 'SUC-01', name: 'María Gómez', pos: 'Facturación', salary: 850 },
+      { id: 3, branchId: 'SUC-02', name: 'Roberto Díaz', pos: 'Encargado', salary: 1350 },
+      { id: 4, branchId: 'SUC-02', name: 'Luis Pérez', pos: 'Facturación', salary: 820 },
+      { id: 5, branchId: 'SUC-03', name: 'Sofía Herrera', pos: 'Encargada', salary: 1300 },
+    ];
+
+    let PAYROLLS = [
+      { id: 'NOM-1', branchId: 'SUC-01', name: 'Laura Méndez', period: '1ra Quincena Nov 2026', date: '2026-11-15', net: 780, status: 'PAGADA' },
+      { id: 'NOM-2', branchId: 'SUC-01', name: 'María Gómez', period: '1ra Quincena Nov 2026', date: '2026-11-15', net: 465, status: 'PAGADA' },
+      { id: 'NOM-3', branchId: 'SUC-02', name: 'Roberto Díaz', period: '1ra Quincena Nov 2026', date: '2026-11-15', net: 710, status: 'PAGADA' },
+      { id: 'NOM-4', branchId: 'SUC-03', name: 'Sofía Herrera', period: '1ra Quincena Nov 2026', date: '2026-11-15', net: 650, status: 'PENDIENTE' },
+    ];
+
+    let TRANSFERS = [
+      { id: 'TR-001', from: 'SUC-01', to: 'SUC-02', productId: 1, productName: 'Amoxil 500mg', qty: 10, status: 'SOLICITADO' }
+    ];
+
+    let CLIENTS = [
+      { id: 1, code: '1', name: 'VENTAS AL CONTADO', rnc: '', phone: '', address: 'Mostrador General', disc: 0, ars: '' },
+      { id: 2, code: '2', name: 'CLÍNICA CORAZONES DEL SUR', rnc: '131-88420-1', phone: '809-555-8820', address: 'Av. Bolívar #210, Gazcue', disc: 10, ars: '' },
+      { id: 3, code: '3', name: 'MARÍA FERNANDA LÓPEZ', rnc: '001-1458923-4', phone: '829-555-3412', address: 'Residencial Las Praderas, Edif. B-3', disc: 5, ars: 'ARS Humano (HUM-992841)' },
+      { id: 4, code: '4', name: 'JOSÉ MIGUEL CASTILLO', rnc: '001-0982341-7', phone: '809-555-9011', address: 'Calle 16 de Agosto #44, Centro', disc: 0, ars: 'SENASA (SEN-441209)' },
+    ];
+
+    let QUOTATIONS = [
+      { id: 'COT-01-000018', date: '2026-11-16', clientId: 3, clientName: 'MARÍA FERNANDA LÓPEZ', note: 'Tratamiento crónico ARS Humano', items: [{ productId: 2, qty: 2 }, { productId: 4, qty: 1 }] },
+      { id: 'COT-02-000009', date: '2026-11-16', clientId: 2, clientName: 'CLÍNICA CORAZONES DEL SUR', note: 'Reposición botiquín', items: [{ productId: 1, qty: 2 }, { productId: 6, qty: 4 }] },
+    ];
+
+    let HELD_INVOICES = [];
+
+    let state = {
+      isAuthenticated: false,
+      activeUserId: 1,
+      globalBranch: 'ALL',
+      tab: 'dashboard',
+      dateMode: 'MONTH',
+      day: '2026-11-15',
+      rangeStart: '2026-11-13',
+      rangeEnd: '2026-11-15',
+      month: '2026-11',
+      year: '2026',
+      searchQuery: '',
+      posSearch: '',
+      cart: [],
+      paymentMethod: 'EFECTIVO',
+      lastTicket: null,
+      editingRoleId: null,
+      charts: [],
+      pos: {
+        clientId: 1,
+        address: 'Mostrador General',
+        rnc: '',
+        phone: '',
+        authNo: '',
+        rxNo: '',
+        seller: 'COMPAÑÍA',
+        cashier: '',
+        invoiceType: 'CONTADO',
+        conduce: '',
+        orderNo: '',
+        ncfType: 'B02',
+        autoNumber: true,
+        autoPrint: true,
+        globalDiscPct: 0,
+        applyItbis: true,
+        coveragePct: 0,
+        received: '',
+        note: '',
+        currency: 'USD',
+        selectedIdx: -1,
+        inlineQuery: '',
+        modal: null,
+        msg: null,
+        err: null,
+        voidTargetId: null,
+        voidReason: ''
+      }
+    };
+
+    const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function getActiveUser() {
+      return USERS.find(u => u.id === state.activeUserId) || USERS[0];
+    }
+
+    function getActiveRole() {
+      const user = getActiveUser();
+      return ROLES.find(r => r.id === user.roleId) || ROLES[0];
+    }
+
+    function matchDate(d) {
+      if (state.dateMode === 'DAY') return d === state.day;
+      if (state.dateMode === 'RANGE') return d >= state.rangeStart && d <= state.rangeEnd;
+      if (state.dateMode === 'MONTH') return d.startsWith(state.month);
+      if (state.dateMode === 'YEAR') return d.startsWith(state.year);
+      return true;
+    }
+
+    // ==========================================
+    // 2. NAVEGACIÓN Y RBAC DINÁMICO
+    // ==========================================
+    function renderShell() {
+      const user = getActiveUser();
+      const role = getActiveRole();
+      const perms = role.permissions;
+
+      const navItems = [
+        { id: 'dashboard', label: 'Dashboard Ejecutivo', icon: '📊' },
+        { id: 'pos', label: 'Facturación (POS)', icon: '🧾' },
+        { id: 'inventory', label: 'Inventario & Traslados', icon: '💊' },
+        { id: 'payroll', label: 'Nómina & Empleados', icon: '👥' },
+        { id: 'roles', label: 'Roles y Usuarios', icon: '🔐' },
+      ].filter(item => perms.includes(item.id));
+
+      if (!perms.includes(state.tab) && navItems.length > 0) {
+        state.tab = navItems[0].id;
+      }
+
+      document.getElementById('sidebar-nav').innerHTML = navItems.map(i => `
+        <button onclick="switchTab('${i.id}')" class="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+          state.tab === i.id
+            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
+            : 'text-slate-300 hover:bg-white/10 hover:text-white'
+        }">
+          <span>${i.icon}</span>
+          <span>${i.label}</span>
+        </button>
+      `).join('');
+
+      // Selector de Usuarios Activos
+      const userSel = document.getElementById('active-user-selector');
+      userSel.innerHTML = USERS.map(u => {
+        const r = ROLES.find(x => x.id === u.roleId);
+        return `<option value="${u.id}" ${u.id === user.id ? 'selected' : ''}>${u.name} (${r ? r.name : 'Sin rol'})</option>`;
+      }).join('');
+
+      const badge = document.getElementById('user-role-badge');
+      badge.textContent = role.name;
+      badge.className = `rounded-full px-2 py-0.5 text-[10px] font-bold ${role.color}`;
+
+      const branchObj = BRANCHES.find(b => b.id === user.branchId);
+      document.getElementById('active-user-branch-hint').textContent =
+        user.branchId === 'ALL' ? 'Acceso global a las 3 farmacias' : `Asignado a: ${branchObj ? branchObj.name : user.branchId}`;
+
+      document.getElementById('header-user-name').textContent = user.name;
+      document.getElementById('header-role-name').textContent = role.name;
+      const currentNav = navItems.find(n => n.id === state.tab);
+      document.getElementById('page-title').textContent = currentNav ? currentNav.label : 'Sin permisos';
+
+      const branchSel = document.getElementById('global-branch-selector');
+      if (user.branchId === 'ALL') {
+        branchSel.disabled = false;
+        branchSel.value = state.globalBranch;
+      } else {
+        branchSel.disabled = true;
+        branchSel.value = user.branchId;
+        state.globalBranch = user.branchId;
+      }
+    }
+
+    function switchTab(t) {
+      state.tab = t;
+      renderApp();
+    }
+
+    function destroyCharts() {
+      state.charts.forEach(c => c.destroy());
+      state.charts = [];
+    }
+
+    // ==========================================
+    // 3. DASHBOARD EJECUTIVO (GRÁFICOS SIMPLES Y COLORIDOS)
+    // ==========================================
+    function renderDashboard(container) {
+      const fSales = SALES.filter(s => (state.globalBranch === 'ALL' || s.branchId === state.globalBranch) && matchDate(s.date));
+      const fPay = PAYROLLS.filter(p => p.status === 'PAGADA' && (state.globalBranch === 'ALL' || p.branchId === state.globalBranch) && matchDate(p.date));
+
+      const gross = fSales.reduce((a, b) => a + b.total, 0);
+      const cogs = fSales.reduce((a, b) => a + b.cogs, 0);
+      const payroll = fPay.reduce((a, b) => a + b.net, 0);
+      const netProfit = gross - cogs - payroll;
+      const margin = gross > 0 ? ((netProfit / gross) * 100).toFixed(1) : '0.0';
+
+      container.innerHTML = `
+        <div class="space-y-6">
+          <!-- FILTROS DINÁMICOS -->
+          <div class="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/80">
+            <span class="text-sm font-bold text-slate-700">📅 Período:</span>
+            <div class="flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+              ${[['DAY','Día'],['RANGE','Rango'],['MONTH','Mes'],['YEAR','Año']].map(([m, l]) => `
+                <button onclick="state.dateMode='${m}'; renderApp()" class="rounded-lg px-3.5 py-1.5 transition ${state.dateMode === m ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'}">${l}</button>
+              `).join('')}
+            </div>
+            ${state.dateMode === 'DAY' ? `<input type="date" value="${state.day}" onchange="state.day=this.value; renderApp()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm">` : ''}
+            ${state.dateMode === 'RANGE' ? `<input type="date" value="${state.rangeStart}" onchange="state.rangeStart=this.value; renderApp()" class="rounded-xl border border-slate-300 px-2.5 py-1.5 text-sm"> <span class="text-xs font-bold">a</span> <input type="date" value="${state.rangeEnd}" onchange="state.rangeEnd=this.value; renderApp()" class="rounded-xl border border-slate-300 px-2.5 py-1.5 text-sm">` : ''}
+            ${state.dateMode === 'MONTH' ? `<input type="month" value="${state.month}" onchange="state.month=this.value; renderApp()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm">` : ''}
+            ${state.dateMode === 'YEAR' ? `<select onchange="state.year=this.value; renderApp()" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm"><option value="2026" ${state.year==='2026'?'selected':''}>2026</option><option value="2025" ${state.year==='2025'?'selected':''}>2025</option></select>` : ''}
+          </div>
+
+          <!-- KPI CARDS COLORIDAS -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-5 text-white shadow-lg shadow-blue-500/20">
+              <p class="text-xs font-bold uppercase tracking-wider text-blue-100">Ventas Brutas</p>
+              <p class="mt-2 text-3xl font-black">${fmt(gross)}</p>
+            </div>
+            <div class="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-5 text-white shadow-lg shadow-amber-500/20">
+              <p class="text-xs font-bold uppercase tracking-wider text-amber-100">Costo Mercancía (COGS)</p>
+              <p class="mt-2 text-3xl font-black">${fmt(cogs)}</p>
+            </div>
+            <div class="rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-5 text-white shadow-lg shadow-rose-500/20">
+              <p class="text-xs font-bold uppercase tracking-wider text-rose-100">Nómina Pagada</p>
+              <p class="mt-2 text-3xl font-black">${fmt(payroll)}</p>
+            </div>
+            <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-5 text-white shadow-lg shadow-emerald-500/20">
+              <p class="text-xs font-bold uppercase tracking-wider text-emerald-100">Ganancia Neta (${margin}%)</p>
+              <p class="mt-2 text-3xl font-black">${fmt(netProfit)}</p>
+            </div>
+          </div>
+
+          <!-- GRÁFICOS SIMPLES Y CLAROS -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+              <h3 class="mb-1 text-base font-bold text-slate-900">Ventas vs. Ganancia Neta</h3>
+              <p class="mb-4 text-xs text-slate-500">Comparativa directa por sucursal</p>
+              <canvas id="chart-comparison" height="170"></canvas>
+            </div>
+
+            <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+              <h3 class="mb-1 text-base font-bold text-slate-900">Top Medicamentos Vendidos</h3>
+              <p class="mb-4 text-xs text-slate-500">Unidades totales vendidas en el período</p>
+              <canvas id="chart-products" height="170"></canvas>
+            </div>
+
+            <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 lg:col-span-2">
+              <h3 class="mb-1 text-base font-bold text-slate-900">Tendencia de Ingresos</h3>
+              <p class="mb-4 text-xs text-slate-500">Evolución diaria de las 3 farmacias</p>
+              <canvas id="chart-timeline" height="85"></canvas>
+            </div>
+          </div>
+
+          <!-- BUSCADOR GLOBAL DE DISPONIBILIDAD -->
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">🔍 Buscador Global de Disponibilidad</h3>
+                <p class="text-xs text-slate-500">Stock en tiempo real en las 3 farmacias</p>
+              </div>
+              <input type="text" value="${state.searchQuery}" oninput="state.searchQuery=this.value; renderDashboardTableOnly()" placeholder="Buscar medicamento o principio activo..." class="w-full md:w-80 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            </div>
+            <div id="availability-table-wrap" class="overflow-x-auto"></div>
+          </div>
+        </div>
+      `;
+
+      renderDashboardTableOnly();
+      initSimpleCharts(fSales, fPay);
+    }
+
+    function renderDashboardTableOnly() {
+      const wrap = document.getElementById('availability-table-wrap');
+      if (!wrap) return;
+      const q = state.searchQuery.trim().toLowerCase();
+      const filteredProds = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q) || p.active.toLowerCase().includes(q));
+
+      wrap.innerHTML = `
+        <table class="w-full text-left text-sm">
+          <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th class="px-4 py-2.5">Medicamento</th>
+              ${BRANCHES.map(b => `<th class="px-4 py-2.5">${b.name}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${filteredProds.map(p => {
+              const branchStocks = BRANCHES.map(b => {
+                const bLots = LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0);
+                return { b, qty: bLots.reduce((s,l)=>s+l.qty,0), aisle: bLots[0]?.aisle || 'Sin stock' };
+              });
+              const donor = branchStocks.find(bs => bs.qty >= 10);
+              return `
+                <tr class="hover:bg-slate-50/80">
+                  <td class="px-4 py-3">
+                    <div class="font-bold text-slate-900">${p.name}</div>
+                    <div class="text-xs text-slate-500">${p.active} · ${p.pres}</div>
+                  </td>
+                  ${branchStocks.map(bs => `
+                    <td class="px-4 py-3">
+                      <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${bs.qty === 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">${bs.qty} uds</span>
+                      <div class="mt-1 text-xs text-slate-500">${bs.aisle}</div>
+                      ${bs.qty === 0 && donor ? `<button onclick="quickTransfer('${donor.b.id}','${bs.b.id}',${p.id},'${p.name}')" class="mt-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Pedir a ${donor.b.name.replace('Farmacia ','')}</button>` : ''}
+                    </td>
+                  `).join('')}
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function initSimpleCharts(fSales, fPay) {
+      destroyCharts();
+      const activeBranches = BRANCHES.filter(b => state.globalBranch === 'ALL' || state.globalBranch === b.id);
+
+      // 1. Gráfico Simple: Ventas vs Ganancia
+      const compData = activeBranches.map(b => {
+        const s = fSales.filter(x => x.branchId === b.id);
+        const p = fPay.filter(x => x.branchId === b.id);
+        const v = s.reduce((a,x)=>a+x.total,0);
+        const g = v - s.reduce((a,x)=>a+x.cogs,0) - p.reduce((a,x)=>a+x.net,0);
+        return { name: b.name.replace('Farmacia ', ''), v, g };
+      });
+      state.charts.push(new Chart(document.getElementById('chart-comparison'), {
+        type: 'bar',
+        data: {
+          labels: compData.map(d => d.name),
+          datasets: [
+            { label: 'Ventas', data: compData.map(d => d.v), backgroundColor: '#4f46e5', borderRadius: 8 },
+            { label: 'Ganancia Neta', data: compData.map(d => d.g), backgroundColor: '#10b981', borderRadius: 8 }
+          ]
+        },
+        options: {
+          plugins: { legend: { position: 'bottom' } },
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+        }
+      }));
+
+      // 2. Gráfico Simple: Top Productos (Barra horizontal limpia)
+      const prodTotals = {};
+      fSales.forEach(s => s.lines.forEach(l => {
+        prodTotals[l.name] = (prodTotals[l.name] || 0) + l.qty;
+      }));
+      const pLabels = Object.keys(prodTotals);
+      state.charts.push(new Chart(document.getElementById('chart-products'), {
+        type: 'bar',
+        data: {
+          labels: pLabels,
+          datasets: [{
+            label: 'Unidades Vendidas',
+            data: pLabels.map(k => prodTotals[k]),
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: { y: { grid: { display: false } }, x: { beginAtZero: true } }
+        }
+      }));
+
+      // 3. Gráfico Simple: Tendencia de Ingresos
+      const dates = [...new Set(fSales.map(s => s.date))].sort();
+      state.charts.push(new Chart(document.getElementById('chart-timeline'), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: activeBranches.map(b => ({
+            label: b.name.replace('Farmacia ', ''),
+            data: dates.map(d => fSales.filter(s => s.date === d && s.branchId === b.id).reduce((a,x)=>a+x.total,0)),
+            borderColor: b.color,
+            backgroundColor: b.color + '22',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4
+          }))
+        },
+        options: {
+          plugins: { legend: { position: 'bottom' } },
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+        }
+      }));
+    }
+
+    function quickTransfer(from, to, productId, productName) {
+      TRANSFERS.unshift({ id: 'TR-' + (TRANSFERS.length + 1), from, to, productId, productName, qty: 10, status: 'SOLICITADO' });
+      alert(`Traslado solicitado: 10 uds de ${productName} (${from} → ${to}).`);
+    }
+
+    // ==========================================
+    // 4. MÓDULO DE FACTURACIÓN (POS) ESTRUCTURADO Y AUTOMATIZADO
+    // ==========================================
+    const POS_RATES = {
+      USD: { sym: '$', rate: 1, label: 'USD' },
+      DOP: { sym: 'RD$', rate: 60.5, label: 'Dólar→RD$' },
+      EUR: { sym: '€', rate: 0.92, label: 'Euro' }
+    };
+
+    function fmtPos(usd) {
+      const r = POS_RATES[state.pos.currency] || POS_RATES.USD;
+      return r.sym + (usd * r.rate).toFixed(2);
+    }
+
+    function getPosTotals() {
+      let subtotal = 0, lineDisc = 0, tax = 0, totalUnits = 0;
+      state.cart.forEach(c => {
+        const p = PRODUCTS.find(x => x.id === c.productId);
+        if (!p) return;
+        const gross = c.qty * c.unitPrice;
+        const disc = gross * ((c.discountPct || 0) / 100);
+        const net = gross - disc;
+        const pct = (!state.pos.applyItbis || c.exempt) ? 0 : (p.tax > 0 ? p.tax : 18);
+        const itbis = net * (pct / 100);
+        subtotal += gross;
+        lineDisc += disc;
+        tax += itbis;
+        totalUnits += c.qty + (c.bonusQty || 0);
+      });
+      const afterLine = subtotal - lineDisc;
+      const gDisc = afterLine * ((state.pos.globalDiscPct || 0) / 100);
+      const totalDisc = lineDisc + gDisc;
+      const adjTax = state.pos.globalDiscPct > 0 ? tax * (1 - state.pos.globalDiscPct / 100) : tax;
+      const invTotal = Math.max(0, subtotal - totalDisc + adjTax);
+      const covAmt = invTotal * ((state.pos.coveragePct || 0) / 100);
+      const total = Math.max(0, invTotal - covAmt);
+      return {
+        subtotal: +subtotal.toFixed(2),
+        totalDisc: +totalDisc.toFixed(2),
+        tax: +adjTax.toFixed(2),
+        covAmt: +covAmt.toFixed(2),
+        total: +total.toFixed(2),
+        totalUnits
+      };
+    }
+
+    function posSelectClient(clientId) {
+      const c = CLIENTS.find(x => x.id === Number(clientId)) || CLIENTS[0];
+      state.pos.clientId = c.id;
+      state.pos.address = c.address || '';
+      state.pos.rnc = c.rnc || '';
+      state.pos.phone = c.phone || '';
+      state.pos.globalDiscPct = c.disc || 0;
+      state.pos.ncfType = (c.rnc && c.rnc.replace(/\D/g, '').length >= 9) ? 'B01' : 'B02';
+      if (c.ars && !state.pos.note) state.pos.note = 'ARS: ' + c.ars;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posResetInvoice() {
+      state.cart = [];
+      state.pos.clientId = 1;
+      state.pos.address = 'Mostrador General';
+      state.pos.rnc = '';
+      state.pos.phone = '';
+      state.pos.authNo = '';
+      state.pos.rxNo = '';
+      state.pos.invoiceType = 'CONTADO';
+      state.pos.conduce = '';
+      state.pos.orderNo = '';
+      state.pos.ncfType = 'B02';
+      state.pos.globalDiscPct = 0;
+      state.pos.coveragePct = 0;
+      state.pos.received = '';
+      state.pos.note = '';
+      state.pos.selectedIdx = -1;
+      state.pos.inlineQuery = '';
+      state.pos.err = null;
+      state.pos.msg = null;
+      state.paymentMethod = 'EFECTIVO';
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posHoldCurrent() {
+      if (state.cart.length === 0) {
+        state.pos.err = 'Agrega al menos un producto para poner en espera.';
+        renderPOS(document.getElementById('main-content'));
+        return;
+      }
+      const c = CLIENTS.find(x => x.id === state.pos.clientId) || CLIENTS[0];
+      HELD_INVOICES.unshift({
+        id: 'ESP-' + Date.now(),
+        savedAt: new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }),
+        clientId: c.id,
+        clientName: c.name,
+        posState: JSON.parse(JSON.stringify(state.pos)),
+        cart: JSON.parse(JSON.stringify(state.cart)),
+        paymentMethod: state.paymentMethod
+      });
+      posResetInvoice();
+      state.pos.msg = 'Factura puesta en espera correctamente.';
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posResumeHeld(id) {
+      const idx = HELD_INVOICES.findIndex(h => h.id === id);
+      if (idx === -1) return;
+      const h = HELD_INVOICES[idx];
+      HELD_INVOICES.splice(idx, 1);
+      state.pos = { ...h.posState, modal: null, msg: `Factura de ${h.clientName} recuperada.`, err: null };
+      state.cart = h.cart;
+      state.paymentMethod = h.paymentMethod;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posLoadQuote(quoteId) {
+      const q = QUOTATIONS.find(x => x.id === quoteId);
+      if (!q) return;
+      const user = getActiveUser();
+      const activeBranchId = user.branchId === 'ALL' ? (state.globalBranch === 'ALL' ? 'SUC-01' : state.globalBranch) : user.branchId;
+      posSelectClient(q.clientId);
+      state.cart = [];
+      q.items.forEach(it => {
+        const p = PRODUCTS.find(x => x.id === it.productId);
+        if (!p) return;
+        const maxStock = LOTS.filter(l => l.branchId === activeBranchId && l.productId === p.id && l.qty > 0).reduce((s, l) => s + l.qty, 0);
+        if (maxStock > 0) {
+          state.cart.push({
+            productId: p.id,
+            sourceBranchId: activeBranchId,
+            qty: Math.min(it.qty, maxStock),
+            bonusQty: 0,
+            unit: 'UNID',
+            unitPrice: p.price,
+            discountPct: 0,
+            exempt: p.tax === 0,
+            coverage100: false,
+            maxStock
+          });
+        }
+      });
+      state.pos.note = q.note;
+      state.pos.modal = null;
+      state.pos.msg = `Cotización ${q.id} cargada.`;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posVoidSale(saleId) {
+      const s = SALES.find(x => x.id === saleId);
+      if (!s || s.status === 'ANULADA') return;
+      if (s.lotDeductions) {
+        s.lotDeductions.forEach(d => {
+          const lot = LOTS.find(l => l.id === d.lotId);
+          if (lot) lot.qty += d.qty;
+        });
+      }
+      s.status = 'ANULADA';
+      s.voidReason = state.pos.voidReason || 'Anulación en POS';
+      state.pos.voidTargetId = null;
+      state.pos.voidReason = '';
+      state.pos.msg = `Factura ${s.id} anulada y stock restaurado.`;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function posCreateClient(e) {
+      e.preventDefault();
+      const name = document.getElementById('nc-name').value.trim().toUpperCase();
+      if (!name) return;
+      const newId = CLIENTS.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+      CLIENTS.push({
+        id: newId,
+        code: String(newId),
+        name,
+        rnc: document.getElementById('nc-rnc').value.trim(),
+        phone: document.getElementById('nc-phone').value.trim(),
+        address: document.getElementById('nc-addr').value.trim(),
+        disc: Number(document.getElementById('nc-disc').value) || 0,
+        ars: document.getElementById('nc-ars').value.trim()
+      });
+      state.pos.modal = null;
+      posSelectClient(newId);
+      state.pos.msg = `Cliente ${name} registrado.`;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function renderPOS(container) {
+      const user = getActiveUser();
+      const activeBranchId = user.branchId === 'ALL' ? (state.globalBranch === 'ALL' ? 'SUC-01' : state.globalBranch) : user.branchId;
+      const branch = BRANCHES.find(b => b.id === activeBranchId);
+      const branchEmps = EMPLOYEES.filter(e => e.branchId === activeBranchId);
+      if (!state.pos.cashier) state.pos.cashier = (branchEmps[0]?.name || user.name).toUpperCase();
+
+      const client = CLIENTS.find(c => c.id === state.pos.clientId) || CLIENTS[0];
+      const branchSalesCount = SALES.filter(s => s.branchId === activeBranchId).length;
+      const previewNo = state.pos.autoNumber ? `FAC-${activeBranchId.slice(-2)}-${String(branchSalesCount + 105).padStart(6, '0')}` : 'No Asignado';
+      const previewNcf = state.pos.autoNumber ? `${state.pos.ncfType}${String(branchSalesCount + 105).padStart(8, '0')}` : 'No Asignado';
+
+      const totals = getPosTotals();
+      const recVal = state.pos.received !== '' ? Number(state.pos.received) : totals.total;
+      const changeDue = Math.max(0, +(recVal - totals.total).toFixed(2));
+
+      const now = new Date();
+      const liveDate = now.toLocaleDateString('es-DO');
+      const liveTime = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const q = state.pos.inlineQuery.trim().toLowerCase();
+      const filteredProds = PRODUCTS.filter(p => !q || p.barcode.toLowerCase().includes(q) || String(p.id) === q || p.name.toLowerCase().includes(q) || p.active.toLowerCase().includes(q));
+
+      const selItem = state.pos.selectedIdx >= 0 ? state.cart[state.pos.selectedIdx] : state.cart[state.cart.length - 1];
+      const selProd = selItem ? PRODUCTS.find(x => x.id === selItem.productId) : null;
+      const selLots = selProd ? LOTS.filter(l => l.branchId === activeBranchId && l.productId === selProd.id && l.qty > 0).sort((a,b)=>a.expiry.localeCompare(b.expiry)) : [];
+      const selLocalStock = selLots.reduce((s,l)=>s+l.qty, 0);
+
+      const pendingDeliveries = SALES.filter(s => s.isDelivery && s.status !== 'ANULADA' && s.deliveryStatus !== 'ENTREGADO').length;
+
+      container.innerHTML = `
+        <div class="flex flex-col rounded-xl border border-slate-300 bg-slate-100 shadow-sm">
+          <!-- BARRA DE TÍTULO -->
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-slate-300 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 px-4 py-2">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <span class="h-2.5 w-2.5 rounded-full" style="background:${branch.color}"></span>
+              <span>Facturación — ${branch.name.toUpperCase()} — ${state.cart.length > 0 ? 'En Proceso' : 'Nuevo Registro'}</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+              <span>RNC: ${branch.rnc}</span><span>·</span>
+              <span class="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">FEFO Automático</span>
+            </div>
+          </div>
+
+          ${state.pos.err ? `<div class="mx-3 mt-2 flex items-center justify-between rounded border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700"><span>⚠ ${state.pos.err}</span><button onclick="state.pos.err=null; renderPOS(document.getElementById('main-content'))">✕</button></div>` : ''}
+          ${state.pos.msg ? `<div class="mx-3 mt-2 flex items-center justify-between rounded border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"><span>✓ ${state.pos.msg}</span><button onclick="state.pos.msg=null; renderPOS(document.getElementById('main-content'))">✕</button></div>` : ''}
+
+          <!-- CUERPO PRINCIPAL -->
+          <div class="flex flex-col gap-3 p-3 lg:flex-row">
+            <!-- ÁREA IZQUIERDA/CENTRO -->
+            <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+              <!-- CABECERA DUAL -->
+              <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+                <!-- CLIENTE + VENDEDOR -->
+                <div class="flex flex-col gap-2 xl:col-span-7">
+                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3 pb-3 pt-1.5">
+                    <legend class="px-1.5 text-xs font-bold text-slate-800">Información del Cliente</legend>
+                    <div class="space-y-2 text-xs">
+                      <div class="flex items-center gap-1.5">
+                        <input type="text" readonly value="${client.code}" class="w-12 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-bold text-slate-800">
+                        <select onchange="posSelectClient(this.value)" class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-bold text-slate-900">
+                          ${CLIENTS.map(c => `<option value="${c.id}" ${c.id===client.id?'selected':''}>${c.name} ${c.ars ? '('+c.ars+')' : ''}</option>`).join('')}
+                        </select>
+                        <button type="button" onclick="state.pos.modal='NEW_CLIENT'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-slate-100 px-2.5 py-1 font-bold text-slate-700 hover:bg-blue-50" title="Nuevo Cliente">...</button>
+                      </div>
+                      <input type="text" value="${state.pos.address}" oninput="state.pos.address=this.value" placeholder="Dirección o referencia del cliente..." class="w-full rounded border border-slate-300 px-2.5 py-1.5 text-slate-800">
+                      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div class="flex items-center gap-2">
+                          <label class="w-24 shrink-0 font-bold text-slate-700">RNC/Cédula</label>
+                          <input type="text" value="${state.pos.rnc}" oninput="state.pos.rnc=this.value; if(this.value.replace(/\\D/g,'').length>=9 && state.pos.ncfType==='B02'){state.pos.ncfType='B01'; renderPOS(document.getElementById('main-content'));}" class="w-full rounded border border-slate-300 px-2 py-1">
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <label class="w-24 shrink-0 font-bold ${state.pos.invoiceType==='SEGURO'?'text-blue-700':'text-slate-700'}">Autorización</label>
+                          <input type="text" value="${state.pos.authNo}" oninput="state.pos.authNo=this.value" class="w-full rounded border ${state.pos.invoiceType==='SEGURO'?'border-blue-500 bg-blue-50/40':'border-slate-300'} px-2 py-1">
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <label class="w-24 shrink-0 font-bold text-slate-700"># Receta Ctrl:</label>
+                          <input type="text" value="${state.pos.rxNo}" oninput="state.pos.rxNo=this.value" class="w-full rounded border border-slate-300 px-2 py-1">
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <label class="w-24 shrink-0 font-bold text-slate-700">Teléfono</label>
+                          <input type="text" value="${state.pos.phone}" oninput="state.pos.phone=this.value" class="w-full rounded border border-slate-300 px-2 py-1">
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+
+                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3 pb-2 pt-1">
+                    <legend class="px-1.5 text-xs font-bold text-slate-800">Vendedor:</legend>
+                    <div class="flex items-center gap-1.5 text-xs">
+                      <span class="w-12 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-bold">1</span>
+                      <select onchange="state.pos.seller=this.value" class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-semibold">
+                        <option value="COMPAÑÍA" ${state.pos.seller==='COMPAÑÍA'?'selected':''}>COMPAÑÍA</option>
+                        ${branchEmps.map(e => `<option value="${e.name.toUpperCase()}" ${state.pos.seller===e.name.toUpperCase()?'selected':''}>${e.name.toUpperCase()}</option>`).join('')}
+                      </select>
+                    </div>
+                  </fieldset>
+                </div>
+
+                <!-- INFORMACIÓN DE LA FACTURA -->
+                <fieldset class="rounded-lg border border-slate-300 bg-white px-3 pb-3 pt-1.5 xl:col-span-5">
+                  <legend class="px-1.5 text-xs font-bold text-slate-800">Información de la Factura</legend>
+                  <div class="space-y-1.5 text-xs">
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Número:</label>
+                      <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-center font-mono font-bold text-blue-800">${previewNo}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Fecha:</label>
+                      <div class="grid flex-1 grid-cols-2 gap-1.5">
+                        <input type="text" readonly value="${liveDate}" class="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-semibold">
+                        <input type="text" readonly value="${liveTime}" class="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-semibold">
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Tipo:</label>
+                      <select onchange="state.pos.invoiceType=this.value; if(this.value==='SEGURO')state.paymentMethod='SEGURO_MEDICO'; renderPOS(document.getElementById('main-content'))" class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-bold">
+                        <option value="CONTADO" ${state.pos.invoiceType==='CONTADO'?'selected':''}>CONTADO</option>
+                        <option value="CREDITO" ${state.pos.invoiceType==='CREDITO'?'selected':''}>CRÉDITO</option>
+                        <option value="SEGURO" ${state.pos.invoiceType==='SEGURO'?'selected':''}>SEGURO MÉDICO</option>
+                        <option value="DOMICILIO" ${state.pos.invoiceType==='DOMICILIO'?'selected':''}>DOMICILIO</option>
+                      </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Conduce:</label>
+                      <input type="text" value="${state.pos.conduce}" oninput="state.pos.conduce=this.value" class="flex-1 rounded border border-slate-300 px-2 py-1">
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Orden No:</label>
+                      <input type="text" value="${state.pos.orderNo}" oninput="state.pos.orderNo=this.value" class="flex-1 rounded border border-slate-300 px-2 py-1">
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Almacén:</label>
+                      <input type="text" readonly value="${branch.name.toUpperCase()}" class="flex-1 rounded border border-slate-200 bg-slate-100 px-2 py-1 font-bold text-slate-800">
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">NCF Tipo:</label>
+                      <select onchange="state.pos.ncfType=this.value; renderPOS(document.getElementById('main-content'))" class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-bold">
+                        <option value="B02" ${state.pos.ncfType==='B02'?'selected':''}>CONSUMIDOR FINAL (B02)</option>
+                        <option value="B01" ${state.pos.ncfType==='B01'?'selected':''}>CRÉDITO FISCAL (B01)</option>
+                        <option value="B14" ${state.pos.ncfType==='B14'?'selected':''}>RÉGIMEN ESPECIAL (B14)</option>
+                        <option value="B15" ${state.pos.ncfType==='B15'?'selected':''}>GUBERNAMENTAL (B15)</option>
+                      </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">NCF:</label>
+                      <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-center font-mono font-bold text-blue-800">${previewNcf}</div>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+
+              <!-- TABLA CENTRAL DE PRODUCTOS -->
+              <div class="flex flex-col rounded-lg border border-slate-300 bg-white">
+                <div class="overflow-x-auto">
+                  <table class="w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr class="border-b border-slate-300 bg-slate-100 text-[11px] font-bold text-slate-800">
+                        <th class="border-r border-slate-200 px-2 py-1.5">Código</th>
+                        <th class="border-r border-slate-200 px-2 py-1.5 text-center">E</th>
+                        <th class="border-r border-slate-200 px-2.5 py-1.5">Descripción</th>
+                        <th class="border-r border-slate-200 px-2 py-1.5 text-right">Ctd</th>
+                        <th class="border-r border-slate-200 px-2 py-1.5 text-right">Oferta</th>
+                        <th class="border-r border-slate-200 px-2 py-1.5">Und</th>
+                        <th class="border-r border-slate-200 px-2.5 py-1.5 text-right">Precio</th>
+                        <th class="border-r border-slate-200 px-2.5 py-1.5 text-right">Total</th>
+                        <th class="border-r border-slate-200 px-2.5 py-1.5 text-right">Total Neto</th>
+                        <th class="border-r border-slate-200 px-2.5 py-1.5 text-right">Itbis</th>
+                        <th class="border-r border-slate-200 px-2 py-1.5 text-center">100%</th>
+                        <th class="px-1.5 py-1.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                      ${state.cart.map((c, idx) => {
+                        const p = PRODUCTS.find(x => x.id === c.productId);
+                        const srcB = BRANCHES.find(b => b.id === c.sourceBranchId);
+                        const gross = c.qty * c.unitPrice;
+                        const net = gross * (1 - (c.discountPct || 0) / 100);
+                        const pct = (!state.pos.applyItbis || c.exempt) ? 0 : (p.tax > 0 ? p.tax : 18);
+                        const itbis = net * (pct / 100);
+                        const isSel = state.pos.selectedIdx === idx;
+                        return `
+                          <tr onclick="state.pos.selectedIdx=${idx}; renderPOS(document.getElementById('main-content'))" class="cursor-pointer ${isSel?'bg-blue-50':'hover:bg-slate-50'}">
+                            <td class="border-r border-slate-200 px-2 py-1.5 font-mono font-bold">${p.barcode.slice(-4)}</td>
+                            <td class="border-r border-slate-200 px-2 py-1.5 text-center"><input type="checkbox" ${c.exempt?'checked':''} onchange="state.cart[${idx}].exempt=this.checked; renderPOS(document.getElementById('main-content'))"></td>
+                            <td class="border-r border-slate-200 px-2.5 py-1.5 font-bold text-blue-900">
+                              ${p.name.toUpperCase()}
+                              ${c.sourceBranchId !== activeBranchId ? `<span class="ml-1 rounded bg-indigo-100 px-1 text-[9px] text-indigo-800">${srcB.name.replace('Farmacia ','')}</span>` : ''}
+                            </td>
+                            <td class="border-r border-slate-200 px-1.5 py-1 text-right"><input type="number" min="1" max="${c.maxStock}" value="${c.qty}" onchange="state.cart[${idx}].qty=Math.max(1,Math.min(${c.maxStock},Number(this.value)||1)); renderPOS(document.getElementById('main-content'))" class="w-14 rounded border border-slate-200 px-1 py-0.5 text-right font-bold text-blue-900"></td>
+                            <td class="border-r border-slate-200 px-1.5 py-1 text-right"><input type="number" min="0" value="${c.bonusQty||0}" onchange="state.cart[${idx}].bonusQty=Math.max(0,Number(this.value)||0); renderPOS(document.getElementById('main-content'))" class="w-12 rounded border border-slate-200 px-1 py-0.5 text-right"></td>
+                            <td class="border-r border-slate-200 px-1.5 py-1">
+                              <select onchange="state.cart[${idx}].unit=this.value" class="bg-transparent font-semibold">
+                                <option value="UNID" ${c.unit==='UNID'?'selected':''}>UNID</option>
+                                <option value="BLIS" ${c.unit==='BLIS'?'selected':''}>BLIS</option>
+                                <option value="CAJA" ${c.unit==='CAJA'?'selected':''}>CAJA</option>
+                              </select>
+                            </td>
+                            <td class="border-r border-slate-200 px-1.5 py-1 text-right"><input type="number" step="0.01" value="${c.unitPrice}" onchange="state.cart[${idx}].unitPrice=Math.max(0,Number(this.value)||0); renderPOS(document.getElementById('main-content'))" class="w-20 rounded border border-slate-200 px-1 py-0.5 text-right font-bold text-blue-900"></td>
+                            <td class="border-r border-slate-200 bg-blue-800 px-2.5 py-1.5 text-right font-bold text-white">${gross.toFixed(2)}</td>
+                            <td class="border-r border-slate-200 px-2.5 py-1.5 text-right font-semibold">${net.toFixed(2)}</td>
+                            <td class="border-r border-slate-200 px-2.5 py-1.5 text-right font-bold text-blue-700">${itbis.toFixed(2)}</td>
+                            <td class="border-r border-slate-200 px-2 py-1.5 text-center"><input type="checkbox" ${c.coverage100?'checked':''} onchange="state.cart[${idx}].coverage100=this.checked"></td>
+                            <td class="px-1.5 py-1.5 text-center"><button onclick="event.stopPropagation(); state.cart.splice(${idx},1); state.pos.selectedIdx=-1; renderPOS(document.getElementById('main-content'))" class="font-bold text-rose-600">✕</button></td>
+                          </tr>
+                        `;
+                      }).join('')}
+
+                      <!-- FILA DINÁMICA DE INGRESO RÁPIDO -->
+                      <tr class="bg-blue-50/40">
+                        <td colspan="12" class="relative p-1.5">
+                          <input id="pos-inline-input" type="text" value="${state.pos.inlineQuery}"
+                            oninput="state.pos.inlineQuery=this.value; renderPOS(document.getElementById('main-content')); setTimeout(()=>{const el=document.getElementById('pos-inline-input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}},0);"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault(); posAddFirstMatch('${activeBranchId}');}"
+                            placeholder="Escriba código, código de barras o nombre del medicamento y presione [Enter]..."
+                            class="w-full bg-transparent px-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none">
+                          ${q.length > 0 ? `
+                            <div class="absolute left-0 right-0 top-full z-30 max-h-60 overflow-y-auto rounded-b-lg border border-slate-300 bg-white shadow-xl">
+                              ${filteredProds.length === 0 ? '<p class="p-3 text-center text-xs text-slate-400">Sin resultados</p>' : filteredProds.map(p => {
+                                const bStocks = BRANCHES.map(b => ({
+                                  id: b.id,
+                                  short: b.name.replace('Farmacia ', ''),
+                                  qty: LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0).reduce((s,l)=>s+l.qty, 0)
+                                }));
+                                return `
+                                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-xs hover:bg-blue-50">
+                                    <div>
+                                      <span class="mr-2 font-mono text-slate-400">${p.barcode}</span>
+                                      <span class="font-bold text-slate-900">${p.name}</span>
+                                      <span class="ml-1 text-[11px] text-slate-500">(${p.active}) · $${p.price.toFixed(2)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                      ${bStocks.map(bs => `
+                                        <button type="button" ${bs.qty===0?'disabled':''} onclick="addCart(${p.id}, '${bs.id}', ${bs.qty}); state.pos.inlineQuery=''; renderPOS(document.getElementById('main-content'))"
+                                          class="rounded px-2 py-0.5 text-[10px] font-bold ${bs.qty===0?'bg-slate-100 text-slate-400': bs.id===activeBranchId?'bg-blue-600 text-white':'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'}">
+                                          ${bs.short}: ${bs.qty}
+                                        </button>
+                                      `).join('')}
+                                    </div>
+                                  </div>
+                                `;
+                              }).join('')}
+                            </div>
+                          ` : ''}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="min-h-[75px] border-t border-slate-100 bg-white"></div>
+
+                <!-- BARRA INFERIOR DEL PRODUCTO SELECCIONADO -->
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-300 bg-slate-50 px-3 py-1.5 text-xs">
+                  ${selProd ? `
+                    <span class="font-bold text-slate-800">${selProd.name.toUpperCase()} · ${selProd.pres}</span>
+                    <div class="flex flex-wrap items-center gap-4">
+                      <span class="font-bold text-slate-900">Existencia Local: ${selLocalStock}</span>
+                      <span class="text-slate-600">${selLots[0] ? `FEFO: ${selLots[0].lot} (${selLots[0].expiry}) · ${selLots[0].aisle}` : 'Sin lote local'}</span>
+                      <div class="flex items-center gap-1.5 text-[11px]">
+                        ${BRANCHES.filter(b=>b.id!==activeBranchId).map(b => {
+                          const qtyB = LOTS.filter(l=>l.branchId===b.id && l.productId===selProd.id && l.qty>0).reduce((s,l)=>s+l.qty,0);
+                          return `<span class="rounded bg-slate-200 px-1.5 py-0.5 text-slate-700">${b.name.replace('Farmacia ','')}: ${qtyB} ${selLocalStock<5 && qtyB>0 ? `<button onclick="quickTransfer('${b.id}','${activeBranchId}',${selProd.id},'${selProd.name}')" class="ml-1 font-bold text-blue-700">⇄</button>` : ''}</span>`;
+                        }).join('')}
+                      </div>
+                    </div>
+                  ` : '<span class="text-slate-400">Seleccione o agregue un producto para ver existencia en las 3 farmacias y lote FEFO</span>'}
+                </div>
+              </div>
+
+              <!-- BARRA DE ATAJOS -->
+              <div class="flex flex-wrap items-center justify-around gap-2 py-0.5 text-xs font-bold text-slate-800">
+                <button onclick="state.pos.modal='LOOKUP'; renderPOS(document.getElementById('main-content'))" class="hover:text-blue-700">[F3] - Buscar</button>
+                <button onclick="if(state.pos.selectedIdx>=0){state.cart.splice(state.pos.selectedIdx,1); state.pos.selectedIdx=-1; renderPOS(document.getElementById('main-content'));}" class="hover:text-rose-700">[F7] - Borrar</button>
+                <span>[Enter] - Próxima Línea</span>
+                <button onclick="document.getElementById('pos-inline-input')?.focus()" class="hover:text-blue-700">[F12] - Seleccionar Área Productos</button>
+              </div>
+
+              <!-- SECCIÓN INFERIOR -->
+              <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+                <!-- INFERIOR IZQUIERDA -->
+                <div class="flex flex-col gap-2 xl:col-span-6">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="w-24 rounded border border-slate-300 bg-white py-1 text-center text-sm font-extrabold text-blue-800">${totals.totalUnits}</div>
+                    <div class="flex flex-wrap gap-1">
+                      ${[['EFECTIVO','Efectivo'],['TARJETA','Tarjeta'],['TRANSFERENCIA','Transf.'],['SEGURO_MEDICO','Seguro']].map(([m,lbl])=>`
+                        <button type="button" onclick="state.paymentMethod='${m}'; renderPOS(document.getElementById('main-content'))"
+                          class="rounded border px-2 py-1 text-[11px] font-bold ${state.paymentMethod===m?'border-blue-600 bg-blue-600 text-white':'border-slate-300 bg-white text-slate-700'}">${lbl}</button>
+                      `).join('')}
+                    </div>
+                  </div>
+
+                  ${state.paymentMethod==='EFECTIVO' ? `
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-bold text-slate-700">Recibido:</span>
+                        <input type="number" step="0.01" value="${state.pos.received}" oninput="state.pos.received=this.value; renderPOS(document.getElementById('main-content'))" placeholder="${totals.total.toFixed(2)}" class="w-24 rounded border border-slate-300 px-2 py-0.5 text-right font-bold">
+                        ${[20,50,100,500].map(v=>`<button type="button" onclick="state.pos.received='${v}'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold">$${v}</button>`).join('')}
+                      </div>
+                      <span class="font-extrabold text-emerald-700">Devuelta: ${fmtPos(changeDue)}</span>
+                    </div>
+                  ` : ''}
+
+                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3 pb-2 pt-1">
+                    <legend class="px-1.5 text-xs font-bold text-slate-800">Nota</legend>
+                    <input type="text" value="${state.pos.note}" oninput="state.pos.note=this.value" placeholder="Observaciones, póliza ARS o dirección..." class="w-full rounded border border-slate-200 px-2 py-1 text-xs">
+                  </fieldset>
+
+                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3 pb-2 pt-1">
+                    <legend class="px-1.5 text-xs font-bold text-slate-800">Información del Facturador</legend>
+                    <select onchange="state.pos.cashier=this.value; renderPOS(document.getElementById('main-content'))" class="w-full bg-transparent text-sm font-extrabold uppercase text-blue-900 focus:outline-none">
+                      ${branchEmps.map(e=>`<option value="${e.name.toUpperCase()}" ${state.pos.cashier===e.name.toUpperCase()?'selected':''}>${e.name.toUpperCase()}</option>`).join('')}
+                      <option value="${user.name.toUpperCase()}" ${state.pos.cashier===user.name.toUpperCase()?'selected':''}>${user.name.toUpperCase()}</option>
+                    </select>
+                  </fieldset>
+                </div>
+
+                <!-- INFERIOR DERECHA -->
+                <div class="flex items-stretch gap-2 xl:col-span-6">
+                  <div class="flex flex-col justify-end gap-1.5 pb-1">
+                    ${Object.keys(POS_RATES).map(c=>`
+                      <button type="button" onclick="state.pos.currency='${c}'; renderPOS(document.getElementById('main-content'))"
+                        class="rounded border px-2.5 py-1.5 text-xs font-bold shadow-sm ${state.pos.currency===c?'border-blue-600 bg-blue-600 text-white':'border-slate-300 bg-white text-slate-700'}">${POS_RATES[c].label}</button>
+                    `).join('')}
+                  </div>
+
+                  <div class="flex-1 space-y-1.5 rounded-lg border border-slate-300 bg-white p-3 text-xs">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="w-28 text-right font-bold text-slate-800">SubTotal:</span>
+                      <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-right font-bold">${fmtPos(totals.subtotal)}</div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="w-28 text-right font-bold text-slate-800">(F9) Desc.:</span>
+                      <div class="flex flex-1 gap-1.5">
+                        <input id="pos-disc-input" type="number" min="0" max="100" value="${state.pos.globalDiscPct}" onchange="state.pos.globalDiscPct=Math.min(100,Math.max(0,Number(this.value)||0)); renderPOS(document.getElementById('main-content'))" class="w-20 rounded border border-slate-300 px-2 py-1 text-right font-bold">
+                        <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-right font-bold">${fmtPos(totals.totalDisc)}</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2">
+                      <label class="flex w-28 items-center justify-end gap-1.5 font-bold text-slate-800">
+                        <input type="checkbox" ${state.pos.applyItbis?'checked':''} onchange="state.pos.applyItbis=this.checked; renderPOS(document.getElementById('main-content'))"> Itbis:
+                      </label>
+                      <div class="flex flex-1 gap-1.5">
+                        <input type="text" readonly value="${state.pos.applyItbis?18:0}" class="w-20 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-right font-bold">
+                        <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-right font-bold">${fmtPos(totals.tax)}</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="w-28 text-right font-bold text-slate-800">Cobertura:</span>
+                      <div class="flex flex-1 gap-1.5">
+                        <input type="number" min="0" max="100" value="${state.pos.coveragePct}" onchange="state.pos.coveragePct=Math.min(100,Math.max(0,Number(this.value)||0)); renderPOS(document.getElementById('main-content'))" class="w-20 rounded border border-slate-300 px-2 py-1 text-right font-bold">
+                        <div class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-right font-bold">${fmtPos(totals.covAmt)}</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 pt-1">
+                      <span class="w-28 text-right text-xs font-extrabold text-blue-900">iFISCAL TOTAL:</span>
+                      <div class="flex-1 rounded bg-blue-800 px-3 py-1.5 text-right text-lg font-extrabold text-amber-300">${fmtPos(totals.total)}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANEL LATERAL DERECHO DE ACCIONES -->
+            <div class="flex w-full shrink-0 flex-col gap-1.5 lg:w-44">
+              <button onclick="posResetInvoice()" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">📄 Nueva</button>
+              <button onclick="state.pos.modal='HISTORY'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-rose-700 shadow-sm hover:bg-rose-50">🚫 Anular</button>
+              <button onclick="state.pos.modal='HISTORY'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">🔍 Buscar</button>
+              <button onclick="state.pos.modal='QUOTES'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">📋 Traer de Cotización</button>
+              <button onclick="posHoldCurrent()" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">✋ Poner En Espera</button>
+              <button onclick="state.pos.modal='HELD'; renderPOS(document.getElementById('main-content'))" class="flex items-center justify-between rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">
+                <span>🔎 Traer de Espera</span>
+                ${HELD_INVOICES.length>0?`<span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">${HELD_INVOICES.length}</span>`:''}
+              </button>
+              <button onclick="state.pos.modal='LOOKUP'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">💊 Consultar Producto</button>
+              <button onclick="state.pos.modal='HISTORY'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">📊 Histórico</button>
+              <button onclick="state.pos.modal='DELIVERY'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">🚚 Q/P Domicilio</button>
+              <button onclick="state.pos.invoiceType='SEGURO'; state.paymentMethod='SEGURO_MEDICO'; if(state.pos.coveragePct===0)state.pos.coveragePct=80; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">🛡️ Q/P Seguro</button>
+              <button onclick="state.pos.modal='DELIVERY'; renderPOS(document.getElementById('main-content'))" class="flex items-center justify-between rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">
+                <span>Domicilio Pend</span>
+                ${pendingDeliveries>0?`<span class="rounded-full bg-emerald-600 px-1.5 text-[10px] text-white">${pendingDeliveries}</span>`:''}
+              </button>
+              <button onclick="state.pos.modal='HELD'; renderPOS(document.getElementById('main-content'))" class="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-left text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">Q/P Pendiente</button>
+
+              <div class="mt-1 space-y-1 border-t border-slate-300 pt-2 text-xs font-bold text-slate-700">
+                <label class="flex cursor-pointer items-center gap-2"><input type="checkbox" ${state.pos.autoNumber?'checked':''} onchange="state.pos.autoNumber=this.checked; renderPOS(document.getElementById('main-content'))"> Número</label>
+                <label class="flex cursor-pointer items-center gap-2"><input type="checkbox" ${state.pos.autoPrint?'checked':''} onchange="state.pos.autoPrint=this.checked"> Imprimir</label>
+              </div>
+
+              <button onclick="checkoutPOS('${activeBranchId}')" ${state.cart.length===0?'disabled':''} class="mt-1 rounded border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:border-slate-300 disabled:bg-slate-300">✓ Guardar</button>
+              <button onclick="posResetInvoice()" class="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">↪ Cerrar</button>
+            </div>
+          </div>
+
+          <!-- BARRA DE ESTADO INFERIOR -->
+          <div class="flex flex-wrap items-center justify-between gap-4 rounded-b-xl border-t border-slate-300 bg-slate-200 px-4 py-1.5 text-[11px] font-bold text-slate-700">
+            <div class="flex flex-wrap items-center gap-6">
+              <span>👤 ${state.pos.cashier}</span>
+              <span>📅 ${liveDate} ${liveTime}</span>
+              <span class="${state.cart.length>0?'text-amber-700':'text-slate-600'}">🏷️ ${state.cart.length>0?'SIN CONFIRMAR':'LISTO PARA FACTURAR'}</span>
+              <span class="text-blue-800">⚡ AUTOMÁTICO (FEFO + NCF)</span>
+            </div>
+            <span class="text-slate-500">[F2] Nueva · [F4] Espera · [F8] Guardar · [F9] Desc.</span>
+          </div>
+        </div>
+
+        ${renderPosModals(activeBranchId, branch)}
+      `;
+    }
+
+    function renderPosModals(activeBranchId, branch) {
+      const m = state.pos.modal;
+      if (!m) return '';
+      const closeBtn = `<button onclick="state.pos.modal=null; renderPOS(document.getElementById('main-content'))" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>`;
+
+      if (m === 'LOOKUP') {
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
+              <div class="flex items-center justify-between border-b px-6 py-4"><h3 class="font-bold text-slate-900">💊 Consulta Integrada (3 Farmacias &amp; FEFO)</h3>${closeBtn}</div>
+              <div class="flex-1 overflow-y-auto p-6 space-y-3">
+                ${PRODUCTS.map(p => {
+                  const stocks = BRANCHES.map(b => ({ b, qty: LOTS.filter(l=>l.branchId===b.id&&l.productId===p.id&&l.qty>0).reduce((s,l)=>s+l.qty,0) }));
+                  return `
+                    <div class="rounded-xl border p-4">
+                      <div class="flex justify-between font-bold text-slate-900"><span>${p.name} <span class="text-xs font-normal text-slate-500">(${p.active} · ${p.pres})</span></span><span class="text-blue-700">$${p.price.toFixed(2)}</span></div>
+                      <div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                        ${stocks.map(s=>`
+                          <button ${s.qty===0?'disabled':''} onclick="addCart(${p.id},'${s.b.id}',${s.qty}); state.pos.modal=null; renderPOS(document.getElementById('main-content'))" class="flex justify-between rounded-lg border px-3 py-2 ${s.qty>0?'bg-emerald-50 hover:bg-emerald-100 font-bold':'bg-slate-100 opacity-50'}">
+                            <span>${s.b.name.replace('Farmacia ','')}</span><span>${s.qty} uds</span>
+                          </button>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (m === 'HISTORY') {
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
+              <div class="flex items-center justify-between border-b px-6 py-4"><h3 class="font-bold text-slate-900">📄 Histórico de Facturas, Reimpresión y Anulación</h3>${closeBtn}</div>
+              ${state.pos.voidTargetId ? `
+                <div class="mx-6 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs">
+                  <p class="font-bold text-rose-900">¿Anular factura ${state.pos.voidTargetId}? Se restaurará el stock FEFO.</p>
+                  <div class="mt-2 flex gap-2">
+                    <input type="text" placeholder="Motivo de anulación..." value="${state.pos.voidReason}" oninput="state.pos.voidReason=this.value" class="flex-1 rounded border bg-white px-2 py-1">
+                    <button onclick="posVoidSale('${state.pos.voidTargetId}')" class="rounded bg-rose-600 px-3 py-1 font-bold text-white">Confirmar</button>
+                    <button onclick="state.pos.voidTargetId=null; renderPOS(document.getElementById('main-content'))" class="rounded bg-white px-3 py-1 border">Cancelar</button>
+                  </div>
+                </div>
+              ` : ''}
+              <div class="flex-1 overflow-y-auto p-6">
+                <table class="w-full text-left text-xs">
+                  <thead class="border-b text-slate-500"><tr><th class="pb-2">Factura</th><th class="pb-2">NCF</th><th class="pb-2">Fecha</th><th class="pb-2">Cliente</th><th class="pb-2 text-right">Total</th><th class="pb-2 text-center">Estado</th><th class="pb-2 text-right">Acciones</th></tr></thead>
+                  <tbody class="divide-y">
+                    ${SALES.map(s=>`
+                      <tr class="${s.status==='ANULADA'?'opacity-60 bg-rose-50/40':''}">
+                        <td class="py-2 font-mono font-bold">${s.id}</td>
+                        <td class="py-2 font-mono">${s.ncf||'—'}</td>
+                        <td class="py-2">${s.date}</td>
+                        <td class="py-2">${s.clientName||'VENTAS AL CONTADO'}</td>
+                        <td class="py-2 text-right font-bold">$${s.total.toFixed(2)}</td>
+                        <td class="py-2 text-center"><span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${s.status==='ANULADA'?'bg-rose-100 text-rose-700':'bg-emerald-100 text-emerald-700'}">${s.status||'CONFIRMADA'}</span></td>
+                        <td class="py-2 text-right">
+                          ${s.status!=='ANULADA'?`<button onclick="state.pos.voidTargetId='${s.id}'; renderPOS(document.getElementById('main-content'))" class="rounded bg-rose-50 px-2 py-1 text-rose-700 font-bold hover:bg-rose-100">Anular</button>`:''}
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (m === 'HELD') {
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+              <div class="flex items-center justify-between border-b px-6 py-4"><h3 class="font-bold text-slate-900">✋ Facturas en Espera</h3>${closeBtn}</div>
+              <div class="p-6 space-y-2 max-h-[60vh] overflow-y-auto">
+                ${HELD_INVOICES.length===0?'<p class="py-6 text-center text-sm text-slate-400">No hay facturas en espera.</p>':HELD_INVOICES.map(h=>`
+                  <div class="flex items-center justify-between rounded-xl border p-3 text-xs">
+                    <div><p class="font-bold">${h.clientName}</p><p class="text-slate-500">Guardada ${h.savedAt} · ${h.cart.length} línea(s)</p></div>
+                    <button onclick="posResumeHeld('${h.id}')" class="rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white">Recuperar</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (m === 'QUOTES') {
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+              <div class="flex items-center justify-between border-b px-6 py-4"><h3 class="font-bold text-slate-900">📋 Traer de Cotización</h3>${closeBtn}</div>
+              <div class="p-6 space-y-2">
+                ${QUOTATIONS.map(q=>`
+                  <div class="flex items-center justify-between rounded-xl border p-3 text-xs">
+                    <div><p class="font-bold">${q.id} — ${q.clientName}</p><p class="text-slate-500">${q.note}</p></div>
+                    <button onclick="posLoadQuote('${q.id}')" class="rounded-lg bg-indigo-600 px-3 py-1.5 font-bold text-white">Cargar</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (m === 'DELIVERY') {
+        const dels = SALES.filter(s => s.isDelivery && s.status !== 'ANULADA');
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+              <div class="flex items-center justify-between border-b px-6 py-4"><h3 class="font-bold text-slate-900">🚚 Domicilios / Delivery Pendientes</h3>${closeBtn}</div>
+              <div class="p-6 space-y-2 max-h-[60vh] overflow-y-auto">
+                ${dels.length===0?'<p class="py-6 text-center text-sm text-slate-400">No hay pedidos a domicilio.</p>':dels.map(d=>`
+                  <div class="flex items-center justify-between rounded-xl border p-3 text-xs">
+                    <div><p class="font-bold">${d.id} — ${d.clientName}</p><p class="text-slate-500">${d.deliveryAddress||'Sin dirección'} · $${d.total.toFixed(2)}</p></div>
+                    <select onchange="SALES.find(x=>x.id==='${d.id}').deliveryStatus=this.value; renderPOS(document.getElementById('main-content'))" class="rounded border px-2 py-1 font-bold">
+                      <option value="PENDIENTE" ${d.deliveryStatus==='PENDIENTE'?'selected':''}>PENDIENTE</option>
+                      <option value="EN_RUTA" ${d.deliveryStatus==='EN_RUTA'?'selected':''}>EN RUTA</option>
+                      <option value="ENTREGADO" ${d.deliveryStatus==='ENTREGADO'?'selected':''}>ENTREGADO</option>
+                    </select>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (m === 'NEW_CLIENT') {
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <form onsubmit="posCreateClient(event)" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-3 text-xs">
+              <div class="flex items-center justify-between"><h3 class="text-sm font-bold text-slate-900">Nuevo Cliente</h3>${closeBtn}</div>
+              <input id="nc-name" required placeholder="Nombre completo / Razón Social *" class="w-full rounded border px-3 py-2">
+              <div class="grid grid-cols-2 gap-2">
+                <input id="nc-rnc" placeholder="RNC / Cédula" class="rounded border px-3 py-2">
+                <input id="nc-phone" placeholder="Teléfono" class="rounded border px-3 py-2">
+              </div>
+              <input id="nc-addr" placeholder="Dirección" class="w-full rounded border px-3 py-2">
+              <div class="grid grid-cols-2 gap-2">
+                <input id="nc-ars" placeholder="ARS / Póliza" class="rounded border px-3 py-2">
+                <input id="nc-disc" type="number" min="0" max="50" value="0" placeholder="Desc %" class="rounded border px-3 py-2">
+              </div>
+              <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="state.pos.modal=null; renderPOS(document.getElementById('main-content'))" class="rounded border px-4 py-2">Cancelar</button>
+                <button type="submit" class="rounded bg-blue-600 px-4 py-2 font-bold text-white">Guardar</button>
+              </div>
+            </form>
+          </div>`;
+      }
+
+      if (m === 'TICKET' && state.lastTicket) {
+        const t = state.lastTicket;
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <div class="no-print mb-3 flex items-center justify-between">
+                <span class="font-bold text-emerald-700 text-sm">✓ Factura ${t.id} Emitida</span>
+                <div class="flex gap-2">
+                  <button onclick="window.print()" class="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white">Imprimir</button>
+                  ${closeBtn}
+                </div>
+              </div>
+              <div class="rounded-xl border bg-slate-50 p-4 font-mono text-xs">
+                <p class="text-center font-bold text-sm">${branch.name.toUpperCase()}</p>
+                <p class="text-center">RNC: ${branch.rnc}</p>
+                <div class="my-2 border-y border-dashed py-2">
+                  <p>Factura: ${t.id} · NCF: ${t.ncf}</p>
+                  <p>Cliente: ${t.clientName}</p>
+                  <p>Facturador: ${t.cashier}</p>
+                </div>
+                ${t.lines.map(l=>`<div class="flex justify-between"><span>${l.qty}x ${l.name} [${l.lot}]</span><span>$${l.total.toFixed(2)}</span></div>`).join('')}
+                <div class="mt-2 border-t border-dashed pt-2 font-bold flex justify-between text-sm">
+                  <span>TOTAL (${t.method})</span><span>$${t.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
+      return '';
+    }
+
+    function posAddFirstMatch(activeBranchId) {
+      const q = state.pos.inlineQuery.trim().toLowerCase();
+      if (!q) return;
+      const p = PRODUCTS.find(x => x.barcode.toLowerCase() === q || String(x.id) === q) ||
+                PRODUCTS.find(x => x.name.toLowerCase().includes(q) || x.active.toLowerCase().includes(q));
+      if (!p) {
+        state.pos.err = `No se encontró producto para "${state.pos.inlineQuery}".`;
+        renderPOS(document.getElementById('main-content'));
+        return;
+      }
+      const stock = LOTS.filter(l => l.branchId === activeBranchId && l.productId === p.id && l.qty > 0).reduce((s,l)=>s+l.qty, 0);
+      if (stock <= 0) {
+        state.pos.err = `Sin stock local de ${p.name}. Selecciona una sucursal con stock en el desplegable.`;
+        renderPOS(document.getElementById('main-content'));
+        return;
+      }
+      addCart(p.id, activeBranchId, stock);
+      state.pos.inlineQuery = '';
+      renderPOS(document.getElementById('main-content'));
+      setTimeout(() => document.getElementById('pos-inline-input')?.focus(), 0);
+    }
+
+    function addCart(productId, sourceBranchId, maxStock) {
+      if (maxStock <= 0) return;
+      const p = PRODUCTS.find(x => x.id === productId);
+      const item = state.cart.find(c => c.productId === productId && c.sourceBranchId === sourceBranchId);
+      if (item) {
+        if (item.qty + (item.bonusQty || 0) < maxStock) item.qty++;
+      } else {
+        state.cart.push({
+          productId,
+          sourceBranchId,
+          qty: 1,
+          bonusQty: 0,
+          unit: 'UNID',
+          unitPrice: p.price,
+          discountPct: 0,
+          exempt: p.tax === 0,
+          coverage100: false,
+          maxStock
+        });
+      }
+      state.pos.selectedIdx = state.cart.length - 1;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    function checkoutPOS(branchId) {
+      if (state.cart.length === 0) return;
+      const totals = getPosTotals();
+      let cogs = 0;
+      const ticketLines = [];
+      const saleLines = [];
+      const lotDeductions = [];
+
+      for (const item of state.cart) {
+        const p = PRODUCTS.find(x => x.id === item.productId);
+        const deductBranch = item.sourceBranchId || branchId;
+        const bLots = LOTS.filter(l => l.branchId === deductBranch && l.productId === p.id && l.qty > 0).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+        let rem = item.qty + (item.bonusQty || 0);
+        for (const l of bLots) {
+          if (rem <= 0) break;
+          const take = Math.min(rem, l.qty);
+          l.qty -= take;
+          rem -= take;
+          cogs += take * l.cost;
+          lotDeductions.push({ lotId: l.id, qty: take });
+          const lineTotal = take * item.unitPrice * (1 - (item.discountPct || 0) / 100);
+          ticketLines.push({ name: p.name, qty: take, lot: `${deductBranch} · ${l.lot}`, total: lineTotal });
+        }
+        saleLines.push({ name: p.name, qty: item.qty });
+      }
+
+      const branchCount = SALES.filter(s => s.branchId === branchId).length;
+      const id = 'FAC-' + branchId.slice(-2) + '-' + String(branchCount + 105).padStart(6, '0');
+      const ncf = state.pos.ncfType + String(branchCount + 105).padStart(8, '0');
+      const client = CLIENTS.find(c => c.id === state.pos.clientId) || CLIENTS[0];
+
+      SALES.unshift({
+        id,
+        ncf,
+        date: '2026-11-16',
+        branchId,
+        clientName: client.name,
+        total: totals.total,
+        cogs: +cogs.toFixed(2),
+        lines: saleLines,
+        lotDeductions,
+        status: 'CONFIRMADA',
+        isDelivery: state.pos.invoiceType === 'DOMICILIO',
+        deliveryStatus: state.pos.invoiceType === 'DOMICILIO' ? 'PENDIENTE' : undefined,
+        deliveryAddress: state.pos.address
+      });
+
+      state.lastTicket = { id, ncf, clientName: client.name, cashier: state.pos.cashier, total: totals.total, method: state.paymentMethod, lines: ticketLines };
+      const shouldPrint = state.pos.autoPrint;
+      posResetInvoice();
+      if (shouldPrint) state.pos.modal = 'TICKET';
+      else state.pos.msg = `Factura ${id} (NCF: ${ncf}) guardada.`;
+      renderPOS(document.getElementById('main-content'));
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (state.tab !== 'pos' || !state.isAuthenticated) return;
+      if (e.key === 'F2') { e.preventDefault(); posResetInvoice(); }
+      else if (e.key === 'F3') { e.preventDefault(); state.pos.modal = 'LOOKUP'; renderPOS(document.getElementById('main-content')); }
+      else if (e.key === 'F4') { e.preventDefault(); posHoldCurrent(); }
+      else if (e.key === 'F5') { e.preventDefault(); state.pos.modal = 'HELD'; renderPOS(document.getElementById('main-content')); }
+      else if (e.key === 'F7' && state.pos.selectedIdx >= 0) { e.preventDefault(); state.cart.splice(state.pos.selectedIdx, 1); state.pos.selectedIdx = -1; renderPOS(document.getElementById('main-content')); }
+      else if (e.key === 'F8') { e.preventDefault(); const u = getActiveUser(); const b = u.branchId === 'ALL' ? (state.globalBranch === 'ALL' ? 'SUC-01' : state.globalBranch) : u.branchId; checkoutPOS(b); }
+      else if (e.key === 'F9') { e.preventDefault(); document.getElementById('pos-disc-input')?.focus(); }
+      else if (e.key === 'F12') { e.preventDefault(); document.getElementById('pos-inline-input')?.focus(); }
+    });
+
+    // ==========================================
+    // 5. MÓDULO DE INVENTARIO
+    // ==========================================
+    function renderInventory(container) {
+      const fLots = LOTS.filter(l => (state.globalBranch === 'ALL' || l.branchId === state.globalBranch) && l.qty > 0).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <h3 class="mb-3 font-bold text-slate-900">💊 Control de Lotes y Vencimientos (FEFO)</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr><th class="px-4 py-2.5">Sucursal</th><th class="px-4 py-2.5">Medicamento</th><th class="px-4 py-2.5">Lote</th><th class="px-4 py-2.5">Pasillo</th><th class="px-4 py-2.5">Stock</th><th class="px-4 py-2.5">Vencimiento</th></tr>
+                </thead>
+                <tbody class="divide-y">
+                  ${fLots.map(l => {
+                    const p = PRODUCTS.find(x => x.id === l.productId);
+                    return `<tr><td class="px-4 py-2.5">${l.branchId}</td><td class="px-4 py-2.5 font-semibold">${p.name}</td><td class="px-4 py-2.5 font-mono text-xs">${l.lot}</td><td class="px-4 py-2.5 text-xs text-slate-500">${l.aisle}</td><td class="px-4 py-2.5 font-bold">${l.qty}</td><td class="px-4 py-2.5">${l.expiry}</td></tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <h3 class="mb-3 font-bold text-slate-900">🔄 Traslados entre Sucursales</h3>
+            <div class="space-y-2">
+              ${TRANSFERS.map(t => `
+                <div class="flex items-center justify-between rounded-xl border p-3 text-sm">
+                  <span><b>${t.productName}</b> (${t.qty} uds) · ${t.from} → ${t.to}</span>
+                  ${t.status === 'SOLICITADO' ? `<button onclick="approveTransfer('${t.id}')" class="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">Aprobar y Mover Stock</button>` : `<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">Completado</span>`}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function approveTransfer(id) {
+      const t = TRANSFERS.find(x => x.id === id);
+      if (!t) return;
+      const srcLot = LOTS.find(l => l.branchId === t.from && l.productId === t.productId && l.qty >= t.qty);
+      if (srcLot) {
+        srcLot.qty -= t.qty;
+        LOTS.push({ id: Date.now(), branchId: t.to, productId: t.productId, lot: srcLot.lot + '-TR', expiry: srcLot.expiry, qty: t.qty, cost: srcLot.cost, aisle: 'Recepción' });
+      }
+      t.status = 'COMPLETADO';
+      renderApp();
+    }
+
+    // ==========================================
+    // 6. MÓDULO DE NÓMINA
+    // ==========================================
+    function renderPayroll(container) {
+      const fEmp = EMPLOYEES.filter(e => state.globalBranch === 'ALL' || e.branchId === state.globalBranch);
+      const fPay = PAYROLLS.filter(p => state.globalBranch === 'ALL' || p.branchId === state.globalBranch);
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <h3 class="mb-3 font-bold text-slate-900">👥 Empleados por Sucursal</h3>
+            <table class="w-full text-left text-sm">
+              <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                <tr><th class="px-4 py-2">Nombre</th><th class="px-4 py-2">Sucursal</th><th class="px-4 py-2">Cargo</th><th class="px-4 py-2">Salario Base</th></tr>
+              </thead>
+              <tbody class="divide-y">
+                ${fEmp.map(e => `<tr><td class="px-4 py-2 font-semibold">${e.name}</td><td class="px-4 py-2">${e.branchId}</td><td class="px-4 py-2">${e.pos}</td><td class="px-4 py-2">${fmt(e.salary)}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <h3 class="mb-3 font-bold text-slate-900">💵 Pagos de Nómina</h3>
+            <table class="w-full text-left text-sm">
+              <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                <tr><th class="px-4 py-2">Empleado</th><th class="px-4 py-2">Período</th><th class="px-4 py-2">Neto</th><th class="px-4 py-2">Estado</th></tr>
+              </thead>
+              <tbody class="divide-y">
+                ${fPay.map(p => `
+                  <tr>
+                    <td class="px-4 py-2 font-semibold">${p.name} (${p.branchId})</td>
+                    <td class="px-4 py-2">${p.period}</td>
+                    <td class="px-4 py-2 font-bold">${fmt(p.net)}</td>
+                    <td class="px-4 py-2">
+                      ${p.status === 'PAGADA' ? '<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">Pagada</span>' : `<button onclick="PAYROLLS.find(x=>x.id==='${p.id}').status='PAGADA'; renderApp()" class="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white">Marcar Pagada</button>`}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 7. GESTIÓN DE ROLES Y USUARIOS (SOLO ADMIN)
+    // ==========================================
+    function renderRolesAndUsers(container) {
+      const editingRole = state.editingRoleId ? ROLES.find(r => r.id === state.editingRoleId) : null;
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <!-- FORMULARIO CREAR / EDITAR ROL -->
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 lg:col-span-5">
+            <h3 class="mb-1 text-base font-bold text-slate-900">
+              ${editingRole ? `✏️ Editar Rol: ${editingRole.name}` : '➕ Crear Nuevo Rol'}
+            </h3>
+            <p class="mb-4 text-xs text-slate-500">Define qué módulos puede ver este rol</p>
+
+            <form onsubmit="saveRoleForm(event)" class="space-y-4">
+              <div>
+                <label class="mb-1 block text-xs font-bold text-slate-600">Nombre del Rol</label>
+                <input id="role-name-input" type="text" required value="${editingRole ? editingRole.name : ''}" placeholder="Ej. Supervisor Nocturno" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="mb-1 block text-xs font-bold text-slate-600">Color de Etiqueta</label>
+                <select id="role-color-input" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                  <option value="bg-indigo-500 text-white" ${editingRole?.color.includes('indigo')?'selected':''}>Índigo</option>
+                  <option value="bg-emerald-500 text-white" ${editingRole?.color.includes('emerald')?'selected':''}>Esmeralda</option>
+                  <option value="bg-amber-500 text-white" ${editingRole?.color.includes('amber')?'selected':''}>Ámbar</option>
+                  <option value="bg-rose-500 text-white" ${editingRole?.color.includes('rose')?'selected':''}>Rosa</option>
+                  <option value="bg-cyan-600 text-white" ${editingRole?.color.includes('cyan')?'selected':''}>Cian</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-xs font-bold text-slate-600">Módulos Permitidos</label>
+                <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  ${ALL_PERMISSIONS.map(perm => {
+                    const checked = editingRole ? editingRole.permissions.includes(perm.key) : perm.key === 'pos';
+                    return `
+                      <label class="flex items-center gap-2.5 text-sm font-medium text-slate-700 cursor-pointer">
+                        <input type="checkbox" name="role-perms" value="${perm.key}" ${checked ? 'checked' : ''} class="h-4 w-4 rounded text-indigo-600">
+                        <span>${perm.label}</span>
+                      </label>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <button type="submit" class="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 py-2.5 text-sm font-bold text-white shadow hover:opacity-95">
+                  ${editingRole ? 'Guardar Cambios' : 'Agregar Rol'}
+                </button>
+                ${editingRole ? `<button type="button" onclick="state.editingRoleId=null; renderApp()" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-600">Cancelar</button>` : ''}
+              </div>
+            </form>
+          </div>
+
+          <!-- LISTA DE ROLES -->
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 lg:col-span-7">
+            <h3 class="mb-4 text-base font-bold text-slate-900">🔐 Roles Configurados</h3>
+            <div class="space-y-3">
+              ${ROLES.map(r => `
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="rounded-full px-3 py-0.5 text-xs font-bold ${r.color}">${r.name}</span>
+                      ${r.protected ? '<span class="text-[11px] font-semibold text-slate-400">(Rol Principal)</span>' : ''}
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      ${r.permissions.map(pk => {
+                        const lbl = ALL_PERMISSIONS.find(x => x.key === pk)?.label || pk;
+                        return `<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${lbl}</span>`;
+                      }).join('')}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="state.editingRoleId='${r.id}'; renderApp()" class="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">Editar</button>
+                    ${!r.protected ? `<button onclick="deleteRole('${r.id}')" class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100">Eliminar</button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- GESTIÓN DE USUARIOS -->
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 lg:col-span-12">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">👤 Usuarios del Sistema</h3>
+                <p class="text-xs text-slate-500">Crea usuarios y asígnales un rol y una sucursal</p>
+              </div>
+              <form onsubmit="addUserForm(event)" class="flex flex-wrap items-center gap-2">
+                <input id="new-user-name" type="text" required placeholder="Nombre completo" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm">
+                <select id="new-user-role" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm">
+                  ${ROLES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                </select>
+                <select id="new-user-branch" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm">
+                  <option value="ALL">Todas las Sucursales</option>
+                  ${BRANCHES.map(b => `<option value="${b.id}">${b.name}</option>`).join('')}
+                </select>
+                <button type="submit" class="rounded-xl bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-emerald-700">+ Agregar Usuario</button>
+              </form>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="px-4 py-2.5">Usuario</th>
+                    <th class="px-4 py-2.5">Rol Asignado</th>
+                    <th class="px-4 py-2.5">Sucursal</th>
+                    <th class="px-4 py-2.5">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  ${USERS.map(u => {
+                    const r = ROLES.find(x => x.id === u.roleId) || { name: 'Sin rol', color: 'bg-slate-200' };
+                    return `
+                      <tr>
+                        <td class="px-4 py-3 font-bold text-slate-900">${u.name}</td>
+                        <td class="px-4 py-3"><span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${r.color}">${r.name}</span></td>
+                        <td class="px-4 py-3 text-slate-600">${u.branchId === 'ALL' ? 'Todas (Consolidado)' : u.branchId}</td>
+                        <td class="px-4 py-3 flex gap-2">
+                          <button onclick="state.activeUserId=${u.id}; renderApp()" class="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Probar Sesión</button>
+                          ${u.id !== 1 ? `<button onclick="deleteUser(${u.id})" class="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">Eliminar</button>` : ''}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveRoleForm(e) {
+      e.preventDefault();
+      const name = document.getElementById('role-name-input').value.trim();
+      const color = document.getElementById('role-color-input').value;
+      const perms = Array.from(document.querySelectorAll('input[name="role-perms"]:checked')).map(el => el.value);
+      if (!name || perms.length === 0) {
+        alert('Debes ingresar un nombre y al menos un módulo permitido.');
+        return;
+      }
+
+      if (state.editingRoleId) {
+        const role = ROLES.find(r => r.id === state.editingRoleId);
+        if (role) {
+          role.name = name;
+          role.color = color;
+          role.permissions = role.protected ? Array.from(new Set([...perms, 'roles'])) : perms;
+        }
+        state.editingRoleId = null;
+      } else {
+        ROLES.push({
+          id: 'ROL-' + Date.now(),
+          name,
+          color,
+          protected: false,
+          permissions: perms
+        });
+      }
+      renderApp();
+    }
+
+    function deleteRole(roleId) {
+      const inUse = USERS.some(u => u.roleId === roleId);
+      if (inUse) {
+        alert('No puedes eliminar este rol porque hay usuarios asignados a él. Elimina o cambia esos usuarios primero.');
+        return;
+      }
+      ROLES = ROLES.filter(r => r.id !== roleId);
+      renderApp();
+    }
+
+    function addUserForm(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-user-name').value.trim();
+      const roleId = document.getElementById('new-user-role').value;
+      const branchId = document.getElementById('new-user-branch').value;
+      if (!name) return;
+      USERS.push({ id: Date.now(), name, email: '', roleId, branchId });
+      renderApp();
+    }
+
+    function deleteUser(userId) {
+      if (state.activeUserId === userId) state.activeUserId = 1;
+      USERS = USERS.filter(u => u.id !== userId);
+      renderApp();
+    }
+
+    // ==========================================
+    // 8. CONTROLADOR PRINCIPAL Y LOGIN
+    // ==========================================
+    function renderLoginScreen() {
+      const quickWrap = document.getElementById('login-quick-users');
+      quickWrap.innerHTML = USERS.map(u => {
+        const r = ROLES.find(x => x.id === u.roleId) || { name: 'Sin rol', color: 'bg-slate-200' };
+        const b = BRANCHES.find(x => x.id === u.branchId);
+        return `
+          <button onclick="loginAsUser(${u.id})" class="flex w-full items-center justify-between rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-500 hover:bg-indigo-50/50">
+            <div>
+              <div class="font-bold text-slate-900 text-sm">${u.name}</div>
+              <div class="text-xs text-slate-500">${u.email || 'Usuario local'} · ${u.branchId === 'ALL' ? 'Todas las sucursales' : (b ? b.name : u.branchId)}</div>
+            </div>
+            <span class="rounded-full px-2.5 py-1 text-xs font-bold ${r.color}">${r.name}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function loginAsUser(userId) {
+      state.activeUserId = userId;
+      const u = getActiveUser();
+      const r = getActiveRole();
+      state.globalBranch = u.branchId;
+      state.tab = r.permissions[0] || 'pos';
+      state.isAuthenticated = true;
+      renderApp();
+    }
+
+    function handleLoginForm(e) {
+      e.preventDefault();
+      const q = document.getElementById('login-user-input').value.trim().toLowerCase();
+      const found = USERS.find(u => u.email.toLowerCase() === q || u.name.toLowerCase().includes(q));
+      if (!found) {
+        alert('Usuario no encontrado. Usa uno de los accesos rápidos de la derecha o verifica el correo.');
+        return;
+      }
+      loginAsUser(found.id);
+    }
+
+    function logout() {
+      destroyCharts();
+      state.isAuthenticated = false;
+      renderApp();
+    }
+
+    function goHome() {
+      const role = getActiveRole();
+      state.tab = role.permissions.includes('dashboard') ? 'dashboard' : (role.permissions[0] || 'pos');
+      state.searchQuery = '';
+      state.posSearch = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      renderApp();
+    }
+
+    function renderApp() {
+      const loginEl = document.getElementById('login-screen');
+      const shellEl = document.getElementById('app-shell');
+
+      if (!state.isAuthenticated) {
+        loginEl.classList.remove('hidden');
+        loginEl.classList.add('flex');
+        shellEl.classList.add('hidden');
+        renderLoginScreen();
+        return;
+      }
+
+      loginEl.classList.add('hidden');
+      loginEl.classList.remove('flex');
+      shellEl.classList.remove('hidden');
+
+      renderShell();
+      const content = document.getElementById('main-content');
+      if (state.tab === 'dashboard') renderDashboard(content);
+      else if (state.tab === 'pos') renderPOS(content);
+      else if (state.tab === 'inventory') renderInventory(content);
+      else if (state.tab === 'payroll') renderPayroll(content);
+      else if (state.tab === 'roles') renderRolesAndUsers(content);
+    }
+
+    document.getElementById('global-branch-selector').addEventListener('change', (e) => {
+      state.globalBranch = e.target.value;
+      renderApp();
+    });
+
+    document.getElementById('active-user-selector').addEventListener('change', (e) => {
+      state.activeUserId = Number(e.target.value);
+      const u = getActiveUser();
+      state.globalBranch = u.branchId;
+      renderApp();
+    });
+
+    renderApp();
+  </script>
+</body>
+</html>

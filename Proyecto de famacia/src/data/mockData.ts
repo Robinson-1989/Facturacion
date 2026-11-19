@@ -1,0 +1,358 @@
+import {
+  Branch,
+  Client,
+  Employee,
+  Lot,
+  PayrollRecord,
+  Product,
+  Quotation,
+  SaleRecord,
+  TransferRequest,
+} from '@/types/pharmacy';
+
+export const BRANCHES: Branch[] = [
+  {
+    id: 'SUC-01',
+    name: 'Farmacia Central',
+    rnc: '130-45891-2',
+    address: 'Av. Independencia #145, Centro',
+    phone: '809-555-0101',
+    color: '#2563eb',
+  },
+  {
+    id: 'SUC-02',
+    name: 'Farmacia Norte',
+    rnc: '130-45891-3',
+    address: 'Plaza Norte Local 12, Zona Norte',
+    phone: '809-555-0202',
+    color: '#10b981',
+  },
+  {
+    id: 'SUC-03',
+    name: 'Farmacia Sur',
+    rnc: '130-45891-4',
+    address: 'Calle Duarte #88, Sector Sur',
+    phone: '809-555-0303',
+    color: '#f59e0b',
+  },
+];
+
+export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: 1,
+    barcode: '750100112233',
+    commercialName: 'Amoxil 500mg',
+    activeIngredient: 'Amoxicilina',
+    laboratory: 'GSK',
+    presentation: 'Caja x 21 Cápsulas',
+    costPrice: 8.5,
+    salePrice: 14.9,
+    taxPct: 0,
+    requiresPrescription: true,
+  },
+  {
+    id: 2,
+    barcode: '750100445566',
+    commercialName: 'Cozaar 50mg',
+    activeIngredient: 'Losartán Potásico',
+    laboratory: 'MSD',
+    presentation: 'Caja x 30 Tabletas',
+    costPrice: 11.0,
+    salePrice: 19.5,
+    taxPct: 0,
+    requiresPrescription: true,
+  },
+  {
+    id: 3,
+    barcode: '750100778899',
+    commercialName: 'Losec 20mg',
+    activeIngredient: 'Omeprazol',
+    laboratory: 'AstraZeneca',
+    presentation: 'Frasco x 28 Cápsulas',
+    costPrice: 6.2,
+    salePrice: 12.0,
+    taxPct: 0,
+    requiresPrescription: false,
+  },
+  {
+    id: 4,
+    barcode: '750100990011',
+    commercialName: 'Glucophage 850mg',
+    activeIngredient: 'Metformina',
+    laboratory: 'Merck',
+    presentation: 'Caja x 30 Tabletas',
+    costPrice: 5.4,
+    salePrice: 10.5,
+    taxPct: 0,
+    requiresPrescription: true,
+  },
+  {
+    id: 5,
+    barcode: '750100334455',
+    commercialName: 'Zithromax 500mg',
+    activeIngredient: 'Azitromicina',
+    laboratory: 'Pfizer',
+    presentation: 'Caja x 3 Tabletas',
+    costPrice: 9.8,
+    salePrice: 17.0,
+    taxPct: 0,
+    requiresPrescription: true,
+  },
+  {
+    id: 6,
+    barcode: '750100667788',
+    commercialName: 'Vitamina C + Zinc 1000mg',
+    activeIngredient: 'Ácido Ascórbico + Zinc',
+    laboratory: 'Bayer',
+    presentation: 'Tubo x 10 Efervescentes',
+    costPrice: 4.1,
+    salePrice: 8.9,
+    taxPct: 18,
+    requiresPrescription: false,
+  },
+];
+
+export const INITIAL_LOTS: Lot[] = [
+  // Producto 1: Amoxil (SUC-01 tiene 2 lotes para probar FEFO; SUC-02 en 0 para probar traslados)
+  { id: 101, branchId: 'SUC-01', productId: 1, lotNumber: 'AMX-26A', expiryDate: '2026-12-05', availableQty: 8, unitCost: 8.5, aisle: 'Pasillo A-2', minStock: 10 },
+  { id: 102, branchId: 'SUC-01', productId: 1, lotNumber: 'AMX-27B', expiryDate: '2027-06-15', availableQty: 34, unitCost: 8.5, aisle: 'Pasillo A-2', minStock: 10 },
+  { id: 103, branchId: 'SUC-03', productId: 1, lotNumber: 'AMX-27C', expiryDate: '2027-03-20', availableQty: 18, unitCost: 8.5, aisle: 'Pasillo A-4', minStock: 10 },
+
+  // Producto 2: Cozaar
+  { id: 201, branchId: 'SUC-01', productId: 2, lotNumber: 'COZ-26Z', expiryDate: '2026-12-10', availableQty: 12, unitCost: 11.0, aisle: 'Pasillo C-1', minStock: 15 },
+  { id: 202, branchId: 'SUC-02', productId: 2, lotNumber: 'COZ-27M', expiryDate: '2027-08-10', availableQty: 65, unitCost: 11.0, aisle: 'Pasillo C-3', minStock: 15 },
+  { id: 203, branchId: 'SUC-03', productId: 2, lotNumber: 'COZ-27S', expiryDate: '2027-05-05', availableQty: 29, unitCost: 11.0, aisle: 'Pasillo B-2', minStock: 15 },
+
+  // Producto 3: Losec (SUC-03 en 0)
+  { id: 301, branchId: 'SUC-01', productId: 3, lotNumber: 'LOS-27A', expiryDate: '2027-09-30', availableQty: 85, unitCost: 6.2, aisle: 'Pasillo D-1', minStock: 20 },
+  { id: 302, branchId: 'SUC-02', productId: 3, lotNumber: 'LOS-27B', expiryDate: '2027-03-12', availableQty: 34, unitCost: 6.2, aisle: 'Pasillo D-2', minStock: 20 },
+
+  // Producto 4: Glucophage
+  { id: 401, branchId: 'SUC-01', productId: 4, lotNumber: 'GLU-27A', expiryDate: '2027-11-01', availableQty: 40, unitCost: 5.4, aisle: 'Pasillo B-4', minStock: 15 },
+  { id: 402, branchId: 'SUC-02', productId: 4, lotNumber: 'GLU-27B', expiryDate: '2027-07-18', availableQty: 52, unitCost: 5.4, aisle: 'Pasillo B-1', minStock: 15 },
+  { id: 403, branchId: 'SUC-03', productId: 4, lotNumber: 'GLU-26X', expiryDate: '2026-12-01', availableQty: 9, unitCost: 5.4, aisle: 'Pasillo C-2', minStock: 15 },
+
+  // Producto 5: Zithromax
+  { id: 501, branchId: 'SUC-01', productId: 5, lotNumber: 'ZIT-27A', expiryDate: '2027-04-22', availableQty: 24, unitCost: 9.8, aisle: 'Pasillo A-1', minStock: 10 },
+  { id: 502, branchId: 'SUC-02', productId: 5, lotNumber: 'ZIT-27B', expiryDate: '2027-05-30', availableQty: 19, unitCost: 9.8, aisle: 'Pasillo A-3', minStock: 10 },
+  { id: 503, branchId: 'SUC-03', productId: 5, lotNumber: 'ZIT-27C', expiryDate: '2027-09-14', availableQty: 31, unitCost: 9.8, aisle: 'Pasillo A-1', minStock: 10 },
+
+  // Producto 6: Vitamina C + Zinc (con ITBIS 18%)
+  { id: 601, branchId: 'SUC-01', productId: 6, lotNumber: 'VIT-27A', expiryDate: '2027-10-15', availableQty: 50, unitCost: 4.1, aisle: 'Mostrador E-1', minStock: 12 },
+  { id: 602, branchId: 'SUC-02', productId: 6, lotNumber: 'VIT-27B', expiryDate: '2027-08-20', availableQty: 28, unitCost: 4.1, aisle: 'Mostrador E-2', minStock: 12 },
+  { id: 603, branchId: 'SUC-03', productId: 6, lotNumber: 'VIT-27C', expiryDate: '2027-06-11', availableQty: 15, unitCost: 4.1, aisle: 'Mostrador E-1', minStock: 12 },
+];
+
+export const INITIAL_SALES: SaleRecord[] = [
+  {
+    id: 'V-1001',
+    invoiceNumber: 'FAC-01-000101',
+    date: '2026-11-13',
+    timestamp: '2026-11-13T10:15:00',
+    branchId: 'SUC-01',
+    cashierName: 'María Gómez',
+    paymentMethod: 'TARJETA',
+    subtotal: 2850,
+    discountTotal: 0,
+    taxTotal: 120,
+    totalSale: 2970,
+    totalCogs: 1710,
+    lines: [
+      { productId: 3, productName: 'Losec 20mg', lotId: 301, lotNumber: 'LOS-27A', qty: 120, unitPrice: 12.0, unitCost: 6.2, discount: 0, tax: 0, lineTotal: 1440 },
+      { productId: 1, productName: 'Amoxil 500mg', lotId: 102, lotNumber: 'AMX-27B', qty: 95, unitPrice: 14.9, unitCost: 8.5, discount: 0, tax: 0, lineTotal: 1415.5 },
+    ],
+  },
+  {
+    id: 'V-1002',
+    invoiceNumber: 'FAC-02-000084',
+    date: '2026-11-13',
+    timestamp: '2026-11-13T14:30:00',
+    branchId: 'SUC-02',
+    cashierName: 'Carlos Ruiz',
+    paymentMethod: 'EFECTIVO',
+    subtotal: 2410,
+    discountTotal: 50,
+    taxTotal: 80,
+    totalSale: 2440,
+    totalCogs: 1430,
+    lines: [
+      { productId: 2, productName: 'Cozaar 50mg', lotId: 202, lotNumber: 'COZ-27M', qty: 80, unitPrice: 19.5, unitCost: 11.0, discount: 0, tax: 0, lineTotal: 1560 },
+      { productId: 4, productName: 'Glucophage 850mg', lotId: 402, lotNumber: 'GLU-27B', qty: 85, unitPrice: 10.5, unitCost: 5.4, discount: 0, tax: 0, lineTotal: 892.5 },
+    ],
+  },
+  {
+    id: 'V-1003',
+    invoiceNumber: 'FAC-03-000059',
+    date: '2026-11-14',
+    timestamp: '2026-11-14T11:20:00',
+    branchId: 'SUC-03',
+    cashierName: 'Ana Torres',
+    paymentMethod: 'SEGURO_MEDICO',
+    subtotal: 2150,
+    discountTotal: 0,
+    taxTotal: 65,
+    totalSale: 2215,
+    totalCogs: 1320,
+    lines: [
+      { productId: 5, productName: 'Zithromax 500mg', lotId: 503, lotNumber: 'ZIT-27C', qty: 75, unitPrice: 17.0, unitCost: 9.8, discount: 0, tax: 0, lineTotal: 1275 },
+      { productId: 1, productName: 'Amoxil 500mg', lotId: 103, lotNumber: 'AMX-27C', qty: 63, unitPrice: 14.9, unitCost: 8.5, discount: 0, tax: 0, lineTotal: 938.7 },
+    ],
+  },
+  {
+    id: 'V-1004',
+    invoiceNumber: 'FAC-01-000102',
+    date: '2026-11-15',
+    timestamp: '2026-11-15T09:05:00',
+    branchId: 'SUC-01',
+    cashierName: 'María Gómez',
+    paymentMethod: 'EFECTIVO',
+    subtotal: 3420,
+    discountTotal: 0,
+    taxTotal: 180,
+    totalSale: 3600,
+    totalCogs: 2040,
+    lines: [
+      { productId: 2, productName: 'Cozaar 50mg', lotId: 201, lotNumber: 'COZ-26Z', qty: 90, unitPrice: 19.5, unitCost: 11.0, discount: 0, tax: 0, lineTotal: 1755 },
+      { productId: 3, productName: 'Losec 20mg', lotId: 301, lotNumber: 'LOS-27A', qty: 110, unitPrice: 12.0, unitCost: 6.2, discount: 0, tax: 0, lineTotal: 1320 },
+    ],
+  },
+  {
+    id: 'V-1005',
+    invoiceNumber: 'FAC-02-000085',
+    date: '2026-11-15',
+    timestamp: '2026-11-15T11:40:00',
+    branchId: 'SUC-02',
+    cashierName: 'Carlos Ruiz',
+    paymentMethod: 'TRANSFERENCIA',
+    subtotal: 2980,
+    discountTotal: 0,
+    taxTotal: 140,
+    totalSale: 3120,
+    totalCogs: 1780,
+    lines: [
+      { productId: 2, productName: 'Cozaar 50mg', lotId: 202, lotNumber: 'COZ-27M', qty: 110, unitPrice: 19.5, unitCost: 11.0, discount: 0, tax: 0, lineTotal: 2145 },
+      { productId: 4, productName: 'Glucophage 850mg', lotId: 402, lotNumber: 'GLU-27B', qty: 92, unitPrice: 10.5, unitCost: 5.4, discount: 0, tax: 0, lineTotal: 966 },
+    ],
+  },
+  {
+    id: 'V-1006',
+    invoiceNumber: 'FAC-03-000060',
+    date: '2026-10-22',
+    timestamp: '2026-10-22T16:10:00',
+    branchId: 'SUC-03',
+    cashierName: 'Ana Torres',
+    paymentMethod: 'EFECTIVO',
+    subtotal: 1950,
+    discountTotal: 0,
+    taxTotal: 90,
+    totalSale: 2040,
+    totalCogs: 1180,
+    lines: [
+      { productId: 5, productName: 'Zithromax 500mg', lotId: 503, lotNumber: 'ZIT-27C', qty: 80, unitPrice: 17.0, unitCost: 9.8, discount: 0, tax: 0, lineTotal: 1360 },
+    ],
+  },
+];
+
+export const INITIAL_EMPLOYEES: Employee[] = [
+  { id: 1, branchId: 'SUC-01', documentId: '001-1234567-1', fullName: 'Laura Méndez', position: 'Encargada de Sucursal', baseSalary: 1400, commissionPct: 1.5, hireDate: '2023-02-10', active: true },
+  { id: 2, branchId: 'SUC-01', documentId: '001-7654321-2', fullName: 'María Gómez', position: 'Cajera / Dependiente', baseSalary: 850, commissionPct: 2.0, hireDate: '2024-05-01', active: true },
+  { id: 3, branchId: 'SUC-02', documentId: '002-2345678-3', fullName: 'Roberto Díaz', position: 'Encargado de Sucursal', baseSalary: 1350, commissionPct: 1.5, hireDate: '2023-07-15', active: true },
+  { id: 4, branchId: 'SUC-02', documentId: '002-8765432-4', fullName: 'Carlos Ruiz', position: 'Cajero / Dependiente', baseSalary: 820, commissionPct: 2.0, hireDate: '2024-09-12', active: true },
+  { id: 5, branchId: 'SUC-03', documentId: '003-3456789-5', fullName: 'Sofía Herrera', position: 'Encargada de Sucursal', baseSalary: 1300, commissionPct: 1.5, hireDate: '2024-01-20', active: true },
+  { id: 6, branchId: 'SUC-03', documentId: '003-9876543-6', fullName: 'Ana Torres', position: 'Cajera / Dependiente', baseSalary: 800, commissionPct: 2.0, hireDate: '2025-03-03', active: true },
+];
+
+export const INITIAL_PAYROLL: PayrollRecord[] = [
+  { id: 'NOM-2026-11-1', branchId: 'SUC-01', employeeId: 1, employeeName: 'Laura Méndez', periodType: 'QUINCENAL', periodLabel: '1ra Quincena Nov 2026', paymentDate: '2026-11-15', grossSalary: 700, commissions: 95, bonuses: 50, legalDeductions: 65, netPay: 780, status: 'PAGADA' },
+  { id: 'NOM-2026-11-2', branchId: 'SUC-01', employeeId: 2, employeeName: 'María Gómez', periodType: 'QUINCENAL', periodLabel: '1ra Quincena Nov 2026', paymentDate: '2026-11-15', grossSalary: 425, commissions: 80, bonuses: 0, legalDeductions: 40, netPay: 465, status: 'PAGADA' },
+  { id: 'NOM-2026-11-3', branchId: 'SUC-02', employeeId: 3, employeeName: 'Roberto Díaz', periodType: 'QUINCENAL', periodLabel: '1ra Quincena Nov 2026', paymentDate: '2026-11-15', grossSalary: 675, commissions: 70, bonuses: 25, legalDeductions: 60, netPay: 710, status: 'PAGADA' },
+  { id: 'NOM-2026-11-4', branchId: 'SUC-03', employeeId: 5, employeeName: 'Sofía Herrera', periodType: 'QUINCENAL', periodLabel: '1ra Quincena Nov 2026', paymentDate: '2026-11-15', grossSalary: 650, commissions: 55, bonuses: 0, legalDeductions: 55, netPay: 650, status: 'PENDIENTE' },
+];
+
+export const INITIAL_TRANSFERS: TransferRequest[] = [
+  {
+    id: 'TR-001',
+    fromBranchId: 'SUC-01',
+    toBranchId: 'SUC-02',
+    productId: 1,
+    productName: 'Amoxil 500mg',
+    qty: 10,
+    status: 'SOLICITADO',
+    requestedBy: 'Roberto Díaz',
+    date: '2026-11-15',
+  },
+];
+
+export const INITIAL_CLIENTS: Client[] = [
+  {
+    id: 1,
+    code: '1',
+    name: 'VENTAS AL CONTADO',
+    rncOrCedula: '',
+    phone: '',
+    address: 'Mostrador General',
+    defaultDiscountPct: 0,
+  },
+  {
+    id: 2,
+    code: '2',
+    name: 'CLÍNICA CORAZONES DEL SUR',
+    rncOrCedula: '131-88420-1',
+    phone: '809-555-8820',
+    address: 'Av. Bolívar #210, Gazcue',
+    defaultDiscountPct: 10,
+  },
+  {
+    id: 3,
+    code: '3',
+    name: 'MARÍA FERNANDA LÓPEZ',
+    rncOrCedula: '001-1458923-4',
+    phone: '829-555-3412',
+    address: 'Residencial Las Praderas, Edif. B-3',
+    defaultDiscountPct: 5,
+    arsProvider: 'ARS Humano',
+    arsPolicyNo: 'HUM-992841',
+  },
+  {
+    id: 4,
+    code: '4',
+    name: 'JOSÉ MIGUEL CASTILLO',
+    rncOrCedula: '001-0982341-7',
+    phone: '809-555-9011',
+    address: 'Calle 16 de Agosto #44, Centro',
+    defaultDiscountPct: 0,
+    arsProvider: 'SENASA Contributivo',
+    arsPolicyNo: 'SEN-441209',
+  },
+];
+
+export const INITIAL_QUOTATIONS: Quotation[] = [
+  {
+    id: 'COT-001',
+    quoteNumber: 'COT-01-000018',
+    branchId: 'SUC-01',
+    date: '2026-11-16',
+    clientId: 3,
+    clientName: 'MARÍA FERNANDA LÓPEZ',
+    note: 'Tratamiento crónico mensual - ARS Humano',
+    estimatedTotal: 54.4,
+    items: [
+      { productId: 2, qty: 2, bonusQty: 0, unit: 'CAJA', unitPrice: 19.5, discountPct: 5, exempt: true, coverage100: false },
+      { productId: 4, qty: 1, bonusQty: 0, unit: 'CAJA', unitPrice: 10.5, discountPct: 5, exempt: true, coverage100: false },
+    ],
+  },
+  {
+    id: 'COT-002',
+    quoteNumber: 'COT-02-000009',
+    branchId: 'SUC-02',
+    date: '2026-11-16',
+    clientId: 2,
+    clientName: 'CLÍNICA CORAZONES DEL SUR',
+    note: 'Reposición botiquín emergencia',
+    estimatedTotal: 67.32,
+    items: [
+      { productId: 1, qty: 2, bonusQty: 0, unit: 'CAJA', unitPrice: 14.9, discountPct: 10, exempt: true, coverage100: false },
+      { productId: 6, qty: 4, bonusQty: 0, unit: 'UNID', unitPrice: 8.9, discountPct: 10, exempt: false, coverage100: false },
+    ],
+  },
+];
