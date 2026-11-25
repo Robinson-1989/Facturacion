@@ -1864,6 +1864,22 @@
         .sort((a, b) => a.daysLeft - b.daysLeft);
     }
 
+    function getLowStockProducts(threshold = 5) {
+      const results = [];
+      const targetBranches = state.globalBranch === 'ALL' ? BRANCHES : BRANCHES.filter(b => b.id === state.globalBranch);
+      targetBranches.forEach(b => {
+        PRODUCTS.forEach(p => {
+          const totalQty = LOTS
+            .filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0)
+            .reduce((s, l) => s + l.qty, 0);
+          if (totalQty <= threshold) {
+            results.push({ product: p, branch: b, totalQty });
+          }
+        });
+      });
+      return results.sort((a, b) => a.totalQty - b.totalQty);
+    }
+
     function renderExpiryAlertBanner() {
       const mainEl = document.getElementById('main-content');
       if (!mainEl) return;
@@ -1875,36 +1891,80 @@
         mainEl.parentNode.insertBefore(host, mainEl);
       }
       const expiring = getExpiringSoonLots(5);
-      if (expiring.length === 0 || state.expiryAlertDismissed) {
+      const lowStock = getLowStockProducts(5);
+
+      if (expiring.length === 0 && lowStock.length === 0) {
         host.innerHTML = '';
         return;
       }
+
+      if (state.expiryAlertDismissed) {
+        host.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm">
+            <span class="flex items-center gap-2">
+              <span>🔔 Alertas de inventario ocultas:</span>
+              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-100 px-2 py-0.5 text-rose-800">${expiring.length} por vencer (≤ 5d)</span>` : ''}
+              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
+            </span>
+            <button type="button" onclick="state.expiryAlertDismissed=false; renderExpiryAlertBanner()" class="rounded-lg bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">
+              Mostrar Alertas
+            </button>
+          </div>
+        `;
+        return;
+      }
+
       host.innerHTML = `
-        <div class="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/70 to-amber-50 px-4 py-3 shadow-sm">
+        <div class="space-y-3 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/60 to-amber-50 px-4 py-3 shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-2 text-sm font-extrabold text-rose-800">
-              <span>⚠️ ALERTA DE VENCIMIENTO (≤ 5 días):</span>
-              <span class="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs text-white">${expiring.length} lote(s)</span>
+            <div class="flex flex-wrap items-center gap-2 text-sm font-extrabold text-slate-900">
+              <span>🔔 Centro de Alertas de Almacén</span>
+              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs text-white">${expiring.length} por vencer (≤ 5 días)</span>` : ''}
+              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-600 px-2.5 py-0.5 text-xs text-white">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
             </div>
             <div class="flex items-center gap-2">
               <button type="button" onclick="state.tab='inventory'; renderApp()" class="rounded-lg bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">Ver Inventario</button>
-              <button type="button" onclick="state.expiryAlertDismissed=true; renderExpiryAlertBanner()" class="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">Ocultar</button>
+              <button type="button" onclick="state.expiryAlertDismissed=true; renderExpiryAlertBanner()" class="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50">Ocultar</button>
             </div>
           </div>
-          <div class="mt-2 flex flex-wrap gap-2">
-            ${expiring.map(x => {
-              const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
-              return `
-                <span class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800">
-                  <strong class="text-rose-700">${x.product.name}</strong>
-                  <span>· ${x.branch.name.replace('Farmacia ', '')}</span>
-                  <span class="font-mono text-slate-500">[${x.lot.lot}]</span>
-                  <span>(${x.lot.qty} uds)</span>
-                  <span class="rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-800">${badge} · ${x.lot.expiry}</span>
-                </span>
-              `;
-            }).join('')}
-          </div>
+
+          ${expiring.length > 0 ? `
+            <div>
+              <p class="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-rose-800">⚠️ Vencimiento próximo (≤ 5 días)</p>
+              <div class="flex flex-wrap gap-2">
+                ${expiring.map(x => {
+                  const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
+                  return `
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800">
+                      <strong class="text-rose-700">${x.product.name}</strong>
+                      <span>· ${x.branch.name.replace('Farmacia ', '')}</span>
+                      <span class="font-mono text-slate-500">[${x.lot.lot}]</span>
+                      <span>(${x.lot.qty} uds)</span>
+                      <span class="rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-800">${badge} · ${x.lot.expiry}</span>
+                    </span>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${lowStock.length > 0 ? `
+            <div>
+              <p class="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock crítico en almacén (≤ 5 unidades)</p>
+              <div class="flex flex-wrap gap-2">
+                ${lowStock.map(x => {
+                  const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
+                  return `
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800">
+                      <strong class="text-amber-800">${x.product.name}</strong>
+                      <span>· ${x.branch.name.replace('Farmacia ', '')}</span>
+                      <span class="rounded ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-1.5 py-0.5 text-[11px] font-bold">${badge}</span>
+                    </span>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
     }
