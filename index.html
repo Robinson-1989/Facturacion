@@ -269,6 +269,7 @@
       lastTicket: null,
       editingRoleId: null,
       charts: [],
+      sidebarMenuOpen: true,
       pos: {
         clientId: 1,
         address: 'Mostrador General',
@@ -328,6 +329,8 @@
       const role = getActiveRole();
       const perms = role.permissions;
 
+      const totalAlerts = getExpiringSoonLots(5).length + getLowStockProducts(5).length;
+
       const navItems = [
         { id: 'dashboard', label: 'Dashboard Ejecutivo', icon: '📊' },
         { id: 'pos', label: 'Facturación (POS)', icon: '🧾' },
@@ -336,20 +339,41 @@
         { id: 'roles', label: 'Roles y Usuarios', icon: '🔐' },
       ].filter(item => perms.includes(item.id));
 
-      if (!perms.includes(state.tab) && navItems.length > 0) {
+      navItems.push({ id: 'alerts', label: 'Alertas de Almacén', icon: '🔔', badge: totalAlerts });
+
+      if (state.tab !== 'alerts' && !perms.includes(state.tab) && navItems.length > 0) {
         state.tab = navItems[0].id;
       }
 
-      document.getElementById('sidebar-nav').innerHTML = navItems.map(i => `
-        <button onclick="switchTab('${i.id}')" class="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
-          state.tab === i.id
-            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-            : 'text-slate-300 hover:bg-white/10 hover:text-white'
-        }">
-          <span>${i.icon}</span>
-          <span>${i.label}</span>
-        </button>
-      `).join('');
+      document.getElementById('sidebar-nav').innerHTML = `
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-2">
+          <button type="button" onclick="state.sidebarMenuOpen=!state.sidebarMenuOpen; renderShell();"
+            class="flex w-full items-center justify-between rounded-xl bg-white/10 px-3.5 py-2.5 text-sm font-extrabold text-white transition hover:bg-white/20">
+            <span class="flex items-center gap-2.5">
+              <span>☰</span>
+              <span>Menú</span>
+              ${!state.sidebarMenuOpen && totalAlerts > 0 ? `<span class="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black text-white">${totalAlerts}</span>` : ''}
+            </span>
+            <span class="text-xs text-cyan-300">${state.sidebarMenuOpen ? '▴' : '▾'}</span>
+          </button>
+
+          <div class="${state.sidebarMenuOpen ? 'mt-2 space-y-1' : 'hidden'}">
+            ${navItems.map(i => `
+              <button onclick="switchTab('${i.id}')" class="flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                state.tab === i.id
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              }">
+                <span class="flex items-center gap-3">
+                  <span>${i.icon}</span>
+                  <span>${i.label}</span>
+                </span>
+                ${i.badge > 0 ? `<span class="rounded-full ${state.tab === i.id ? 'bg-white text-blue-700' : 'bg-rose-500 text-white'} px-2 py-0.5 text-[11px] font-black">${i.badge}</span>` : ''}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
 
       // Selector de Usuarios Activos
       const userSel = document.getElementById('active-user-selector');
@@ -1488,7 +1512,7 @@
       posResetInvoice();
       if (shouldPrint) state.pos.modal = 'TICKET';
       else state.pos.msg = `Factura ${id} (NCF: ${ncf}) guardada.`;
-      renderExpiryAlertBanner();
+      renderShell();
       renderPOS(document.getElementById('main-content'));
     }
 
@@ -1895,124 +1919,90 @@
     }
 
     function renderExpiryAlertBanner() {
-      const mainEl = document.getElementById('main-content');
-      if (!mainEl) return;
-      let host = document.getElementById('expiry-alert-host');
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'expiry-alert-host';
-        host.className = 'no-print mx-6 mt-4';
-        mainEl.parentNode.insertBefore(host, mainEl);
-      }
+      const host = document.getElementById('expiry-alert-host');
+      if (host) host.innerHTML = '';
+    }
+
+    function renderAlertsView(container) {
       const expiring = getExpiringSoonLots(5);
       const lowStock = getLowStockProducts(5);
 
-      if (expiring.length === 0 && lowStock.length === 0) {
-        host.innerHTML = '';
-        return;
-      }
-
-      if (state.expiryAlertDismissed) {
-        host.innerHTML = `
-          <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/95 px-4 py-2.5 text-xs font-bold text-slate-800 shadow-sm">
-            <span class="flex flex-wrap items-center gap-2">
-              <span>🔔 Centro de Alertas de Almacén:</span>
-              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-rose-800">${expiring.length} por vencer (≤ 5d)</span>` : ''}
-              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-200 px-2.5 py-0.5 text-amber-900">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
-            </span>
-            <button type="button" onclick="state.expiryAlertDismissed=false; renderExpiryAlertBanner()" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700">
-              <span>Mostrar Alertas</span>
-              <span>▾</span>
+      container.innerHTML = `
+        <div class="space-y-5 rounded-2xl border border-amber-300 bg-white p-6 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <h3 class="text-lg font-extrabold text-slate-900">🔔 Centro de Alertas de Almacén</h3>
+              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-600 px-3 py-0.5 text-xs font-bold text-white">${expiring.length} por vencer (≤ 5 días)</span>` : ''}
+              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-600 px-3 py-0.5 text-xs font-bold text-white">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
+            </div>
+            <button type="button" onclick="switchTab('inventory')" class="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700">
+              💊 Ir al Inventario Completo
             </button>
           </div>
-        `;
-        return;
-      }
 
-      host.innerHTML = `
-        <div class="relative rounded-xl border border-amber-300 bg-amber-50/95 shadow-sm">
-          <!-- CABECERA DEL DESPLEGABLE -->
-          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-            <div class="flex flex-wrap items-center gap-2 text-sm font-extrabold text-slate-900">
-              <span>🔔 Centro de Alertas de Almacén</span>
-              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs text-white">${expiring.length} por vencer (≤ 5 días)</span>` : ''}
-              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-600 px-2.5 py-0.5 text-xs text-white">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
-            </div>
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="state.tab='inventory'; renderApp()" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Ver Inventario</button>
-              <button type="button" onclick="state.expiryAlertDismissed=true; renderExpiryAlertBanner()" class="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                <span>Ocultar</span>
-                <span>▴</span>
-              </button>
+          <div>
+            <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-rose-800">⚠️ Productos Próximos a Vencer (≤ 5 días)</h4>
+            <div class="overflow-x-auto rounded-xl border border-rose-200">
+              <table class="w-full border-collapse text-left text-sm">
+                <thead class="bg-rose-50 text-xs font-extrabold uppercase text-rose-900">
+                  <tr>
+                    <th class="border-b border-rose-200 px-4 py-2.5">Producto</th>
+                    <th class="border-b border-rose-200 px-4 py-2.5">Farmacia</th>
+                    <th class="border-b border-rose-200 px-4 py-2.5">Lote</th>
+                    <th class="border-b border-rose-200 px-4 py-2.5 text-right">Stock</th>
+                    <th class="border-b border-rose-200 px-4 py-2.5 text-center">Fecha Venc.</th>
+                    <th class="border-b border-rose-200 px-4 py-2.5 text-center">Estado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-rose-100">
+                  ${expiring.length === 0 ? `
+                    <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400 font-semibold">No hay productos próximos a vencer en los próximos 5 días.</td></tr>
+                  ` : expiring.map(x => {
+                    const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
+                    return `
+                      <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-rose-50/60" title="Clic para ver en Inventario">
+                        <td class="px-4 py-2.5 font-bold text-slate-900 underline decoration-rose-300">${x.product.name}</td>
+                        <td class="px-4 py-2.5 text-slate-700">${x.branch.name}</td>
+                        <td class="px-4 py-2.5 font-mono text-slate-600">${x.lot.lot}</td>
+                        <td class="px-4 py-2.5 text-right font-bold text-slate-900">${x.lot.qty} uds</td>
+                        <td class="px-4 py-2.5 text-center font-mono text-slate-700">${x.lot.expiry}</td>
+                        <td class="px-4 py-2.5 text-center"><span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800">${badge}</span></td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <!-- CUADRO DESPLEGABLE ORGANIZADO EN TABLAS -->
-          <div class="max-h-96 overflow-y-auto border-t border-amber-200 bg-white p-4 rounded-b-xl space-y-4">
-            ${expiring.length > 0 ? `
-              <div>
-                <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-rose-800">⚠️ Productos Próximos a Vencer (≤ 5 días)</h4>
-                <div class="overflow-x-auto rounded-lg border border-rose-200">
-                  <table class="w-full border-collapse text-left text-xs">
-                    <thead class="bg-rose-50 text-[11px] font-extrabold uppercase text-rose-900">
-                      <tr>
-                        <th class="border-b border-rose-200 px-3 py-2">Producto</th>
-                        <th class="border-b border-rose-200 px-3 py-2">Farmacia</th>
-                        <th class="border-b border-rose-200 px-3 py-2">Lote</th>
-                        <th class="border-b border-rose-200 px-3 py-2 text-right">Stock</th>
-                        <th class="border-b border-rose-200 px-3 py-2 text-center">Fecha Venc.</th>
-                        <th class="border-b border-rose-200 px-3 py-2 text-center">Estado</th>
+          <div>
+            <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock Crítico en Almacén (≤ 5 unidades)</h4>
+            <div class="overflow-x-auto rounded-xl border border-amber-200">
+              <table class="w-full border-collapse text-left text-sm">
+                <thead class="bg-amber-50 text-xs font-extrabold uppercase text-amber-900">
+                  <tr>
+                    <th class="border-b border-amber-200 px-4 py-2.5">Producto</th>
+                    <th class="border-b border-amber-200 px-4 py-2.5">Farmacia</th>
+                    <th class="border-b border-amber-200 px-4 py-2.5 text-right">Existencia</th>
+                    <th class="border-b border-amber-200 px-4 py-2.5 text-center">Estado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-amber-100">
+                  ${lowStock.length === 0 ? `
+                    <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400 font-semibold">Todos los productos en inventario tienen más de 5 unidades.</td></tr>
+                  ` : lowStock.map(x => {
+                    const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
+                    return `
+                      <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
+                        <td class="px-4 py-2.5 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
+                        <td class="px-4 py-2.5 text-slate-700">${x.branch.name}</td>
+                        <td class="px-4 py-2.5 text-right font-bold text-slate-900">${x.totalQty} uds</td>
+                        <td class="px-4 py-2.5 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-xs font-bold">${badge}</span></td>
                       </tr>
-                    </thead>
-                    <tbody class="divide-y divide-rose-100">
-                      ${expiring.map(x => {
-                        const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
-                        return `
-                          <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-rose-50/60" title="Clic para ver en Inventario">
-                            <td class="px-3 py-2 font-bold text-slate-900 underline decoration-rose-300">${x.product.name}</td>
-                            <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
-                            <td class="px-3 py-2 font-mono text-slate-600">${x.lot.lot}</td>
-                            <td class="px-3 py-2 text-right font-bold text-slate-900">${x.lot.qty} uds</td>
-                            <td class="px-3 py-2 text-center font-mono text-slate-700">${x.lot.expiry}</td>
-                            <td class="px-3 py-2 text-center"><span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-800">${badge}</span></td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ` : ''}
-
-            <div>
-              <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock Crítico en Almacén (≤ 5 unidades)</h4>
-              <div class="overflow-x-auto rounded-lg border border-amber-200">
-                <table class="w-full border-collapse text-left text-xs">
-                  <thead class="bg-amber-50 text-[11px] font-extrabold uppercase text-amber-900">
-                    <tr>
-                      <th class="border-b border-amber-200 px-3 py-2">Producto</th>
-                      <th class="border-b border-amber-200 px-3 py-2">Farmacia</th>
-                      <th class="border-b border-amber-200 px-3 py-2 text-right">Existencia</th>
-                      <th class="border-b border-amber-200 px-3 py-2 text-center">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-amber-100">
-                    ${lowStock.length === 0 ? `
-                      <tr><td colspan="4" class="px-3 py-3 text-center text-slate-400 font-semibold">Todos los productos en inventario tienen más de 5 unidades.</td></tr>
-                    ` : lowStock.map(x => {
-                      const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
-                      return `
-                        <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
-                          <td class="px-3 py-2 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
-                          <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
-                          <td class="px-3 py-2 text-right font-bold text-slate-900">${x.totalQty} uds</td>
-                          <td class="px-3 py-2 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-[11px] font-bold">${badge}</span></td>
-                        </tr>
-                      `;
-                    }).join('')}
-                  </tbody>
-                </table>
-              </div>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -2036,13 +2026,13 @@
       shellEl.classList.remove('hidden');
 
       renderShell();
-      renderExpiryAlertBanner();
       const content = document.getElementById('main-content');
       if (state.tab === 'dashboard') renderDashboard(content);
       else if (state.tab === 'pos') renderPOS(content);
       else if (state.tab === 'inventory') renderInventory(content);
       else if (state.tab === 'payroll') renderPayroll(content);
       else if (state.tab === 'roles') renderRolesAndUsers(content);
+      else if (state.tab === 'alerts') renderAlertsView(content);
     }
 
     document.getElementById('global-branch-selector').addEventListener('change', (e) => {
