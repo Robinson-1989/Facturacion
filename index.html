@@ -1511,7 +1511,10 @@
       container.innerHTML = `
         <div class="space-y-6">
           <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
-            <h3 class="mb-3 font-bold text-slate-900">💊 Control de Lotes y Vencimientos (FEFO)</h3>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="font-bold text-slate-900">💊 Control de Lotes y Vencimientos (FEFO)</h3>
+              ${state.highlightProductId ? `<button type="button" onclick="state.highlightProductId=null; state.highlightBranchId=null; renderApp()" class="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200">Quitar resaltado</button>` : ''}
+            </div>
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm">
                 <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
@@ -1520,7 +1523,8 @@
                 <tbody class="divide-y">
                   ${fLots.map(l => {
                     const p = PRODUCTS.find(x => x.id === l.productId);
-                    return `<tr><td class="px-4 py-2.5">${l.branchId}</td><td class="px-4 py-2.5 font-semibold">${p.name}</td><td class="px-4 py-2.5 font-mono text-xs">${l.lot}</td><td class="px-4 py-2.5 text-xs text-slate-500">${l.aisle}</td><td class="px-4 py-2.5 font-bold">${l.qty}</td><td class="px-4 py-2.5">${l.expiry}</td></tr>`;
+                    const isHl = state.highlightProductId === l.productId && (!state.highlightBranchId || state.highlightBranchId === l.branchId);
+                    return `<tr class="${isHl ? 'bg-amber-100/80 font-semibold' : 'hover:bg-slate-50'}"><td class="px-4 py-2.5">${l.branchId}</td><td class="px-4 py-2.5 font-semibold">${p.name}</td><td class="px-4 py-2.5 font-mono text-xs">${l.lot}</td><td class="px-4 py-2.5 text-xs text-slate-500">${l.aisle}</td><td class="px-4 py-2.5 font-bold ${l.qty <= 5 ? 'text-rose-700' : ''}">${l.qty}</td><td class="px-4 py-2.5">${l.expiry}</td></tr>`;
                   }).join('')}
                 </tbody>
               </table>
@@ -1869,15 +1873,24 @@
       const targetBranches = state.globalBranch === 'ALL' ? BRANCHES : BRANCHES.filter(b => b.id === state.globalBranch);
       targetBranches.forEach(b => {
         PRODUCTS.forEach(p => {
-          const totalQty = LOTS
-            .filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0)
-            .reduce((s, l) => s + l.qty, 0);
+          const branchLots = LOTS.filter(l => l.branchId === b.id && l.productId === p.id);
+          // Solo evaluar productos que están registrados en el inventario de esta sucursal
+          if (branchLots.length === 0) return;
+          const totalQty = branchLots.reduce((s, l) => s + Math.max(0, l.qty), 0);
           if (totalQty <= threshold) {
             results.push({ product: p, branch: b, totalQty });
           }
         });
       });
       return results.sort((a, b) => a.totalQty - b.totalQty);
+    }
+
+    function openAlertInInventory(productId, branchId) {
+      state.highlightProductId = productId;
+      state.highlightBranchId = branchId;
+      state.tab = 'inventory';
+      state.expiryAlertDismissed = true;
+      renderApp();
     }
 
     function renderExpiryAlertBanner() {
@@ -1954,8 +1967,8 @@
                       ${expiring.map(x => {
                         const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
                         return `
-                          <tr class="hover:bg-rose-50/40">
-                            <td class="px-3 py-2 font-bold text-slate-900">${x.product.name}</td>
+                          <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-rose-50/60" title="Clic para ver en Inventario">
+                            <td class="px-3 py-2 font-bold text-slate-900 underline decoration-rose-300">${x.product.name}</td>
                             <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
                             <td class="px-3 py-2 font-mono text-slate-600">${x.lot.lot}</td>
                             <td class="px-3 py-2 text-right font-bold text-slate-900">${x.lot.qty} uds</td>
@@ -1987,8 +2000,8 @@
                       ${lowStock.map(x => {
                         const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
                         return `
-                          <tr class="hover:bg-amber-50/40">
-                            <td class="px-3 py-2 font-bold text-slate-900">${x.product.name}</td>
+                          <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
+                            <td class="px-3 py-2 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
                             <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
                             <td class="px-3 py-2 text-right font-bold text-slate-900">${x.totalQty} uds</td>
                             <td class="px-3 py-2 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-[11px] font-bold">${badge}</span></td>
