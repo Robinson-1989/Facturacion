@@ -181,9 +181,23 @@
       { id: 5, name: 'Roberto Díaz', email: 'roberto.inv@farmaerp.com', roleId: 'ROL-INV', branchId: 'SUC-03' },
     ];
 
-    const PRODUCTS = Array.isArray(window.CATALOG_PRODUCTS) ? window.CATALOG_PRODUCTS : [];
+    const SAVED_PRODS = (() => { try { return JSON.parse(localStorage.getItem('farma_products_v1') || 'null'); } catch { return null; } })();
+    const SAVED_LOTS = (() => { try { return JSON.parse(localStorage.getItem('farma_lots_v1') || 'null'); } catch { return null; } })();
 
-    let LOTS = Array.isArray(window.CATALOG_LOTS) ? window.CATALOG_LOTS.map(l => ({ ...l })) : [];
+    const PRODUCTS = Array.isArray(SAVED_PRODS) && SAVED_PRODS.length > 0
+      ? SAVED_PRODS
+      : (Array.isArray(window.CATALOG_PRODUCTS) ? window.CATALOG_PRODUCTS.map(p => ({ ...p })) : []);
+
+    let LOTS = Array.isArray(SAVED_LOTS) && SAVED_LOTS.length > 0
+      ? SAVED_LOTS
+      : (Array.isArray(window.CATALOG_LOTS) ? window.CATALOG_LOTS.map(l => ({ ...l })) : []);
+
+    function saveCatalogToStorage() {
+      try {
+        localStorage.setItem('farma_products_v1', JSON.stringify(PRODUCTS));
+        localStorage.setItem('farma_lots_v1', JSON.stringify(LOTS));
+      } catch (e) { /* ignore storage quota errors */ }
+    }
 
     let SALES = [
       { id: 'FAC-01-00101', date: '2026-11-13', branchId: 'SUC-01', total: 2970, cogs: 1710, lines: [{ name: 'Losec 20mg', qty: 120 }, { name: 'Amoxil 500mg', qty: 95 }] },
@@ -278,7 +292,13 @@
         showTooltips: localStorage.getItem('farma_pos_tooltips') !== 'false'
       },
       invQuery: '',
-      invDept: 'ALL'
+      invDept: 'ALL',
+      dashPage: 1,
+      dashShowAll: false,
+      invProdPage: 1,
+      invProdShowAll: false,
+      invLotShowAll: false,
+      prodModal: null
     };
 
     const fmt = (n) => 'RD$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -469,10 +489,13 @@
           <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
             <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 class="text-base font-bold text-slate-900">🔍 Buscador Global de Disponibilidad</h3>
-                <p class="text-xs text-slate-500">Stock en tiempo real en las 3 farmacias</p>
+                <h3 class="text-base font-bold text-slate-900">🔍 Buscador Global de Disponibilidad (${PRODUCTS.length} Productos)</h3>
+                <p class="text-xs text-slate-500">Stock en tiempo real en las 3 farmacias · Con botones para agregar, editar y eliminar</p>
               </div>
-              <input type="text" value="${state.searchQuery}" oninput="state.searchQuery=this.value; renderDashboardTableOnly()" placeholder="Buscar medicamento o principio activo..." class="w-full md:w-80 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+              <div class="flex flex-wrap items-center gap-2">
+                <input type="text" value="${state.searchQuery}" oninput="state.searchQuery=this.value; state.dashPage=1; renderDashboardTableOnly()" placeholder="Buscar medicamento, SKU o principio activo..." class="w-full md:w-72 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                <button type="button" onclick="openProductModal(null)" class="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">➕ Agregar Producto</button>
+              </div>
             </div>
             <div id="availability-table-wrap" class="overflow-x-auto"></div>
           </div>
@@ -487,14 +510,33 @@
       const wrap = document.getElementById('availability-table-wrap');
       if (!wrap) return;
       const q = state.searchQuery.trim().toLowerCase();
-      const filteredProds = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q) || p.active.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))).slice(0, 30);
+      const matched = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q) || p.active.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)) || (p.barcode && p.barcode.toLowerCase().includes(q)));
+      const perPage = 50;
+      const totalPages = Math.max(1, Math.ceil(matched.length / perPage));
+      if (state.dashPage > totalPages) state.dashPage = totalPages;
+      const start = state.dashShowAll ? 0 : (state.dashPage - 1) * perPage;
+      const filteredProds = state.dashShowAll ? matched : matched.slice(start, start + perPage);
 
       wrap.innerHTML = `
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <span>Mostrando <b>${matched.length === 0 ? 0 : start + 1}–${start + filteredProds.length}</b> de <b>${matched.length}</b> medicamentos en las 3 farmacias</span>
+          <div class="flex flex-wrap items-center gap-1.5">
+            ${!state.dashShowAll && totalPages > 1 ? `
+              <button type="button" ${state.dashPage<=1?'disabled':''} onclick="state.dashPage--; renderDashboardTableOnly()" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">← Anterior</button>
+              <span class="px-2 font-semibold">Pág. ${state.dashPage}/${totalPages}</span>
+              <button type="button" ${state.dashPage>=totalPages?'disabled':''} onclick="state.dashPage++; renderDashboardTableOnly()" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">Siguiente →</button>
+            ` : ''}
+            <button type="button" onclick="state.dashShowAll=!state.dashShowAll; state.dashPage=1; renderDashboardTableOnly()" class="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 hover:bg-indigo-100">
+              ${state.dashShowAll ? 'Paginar (50 por pág.)' : `Ver todos (${matched.length})`}
+            </button>
+          </div>
+        </div>
         <table class="w-full text-left text-sm">
           <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th class="px-4 py-2.5">Medicamento</th>
               ${BRANCHES.map(b => `<th class="px-4 py-2.5">${b.name}</th>`).join('')}
+              <th class="px-4 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -507,16 +549,20 @@
               return `
                 <tr class="hover:bg-slate-50/80">
                   <td class="px-4 py-3">
-                    <div class="font-bold text-slate-900">${p.name}</div>
-                    <div class="text-xs text-slate-500">${p.active} · ${p.pres}</div>
+                    <div class="font-bold text-slate-900">${p.name} <span class="ml-1 font-mono text-[11px] font-normal text-slate-400">${p.sku || p.id}</span></div>
+                    <div class="text-xs text-slate-500">${p.active} · ${p.pres} · <b class="text-slate-700">${fmt(p.price)}</b></div>
                   </td>
                   ${branchStocks.map(bs => `
                     <td class="px-4 py-3">
-                      <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${bs.qty === 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">${bs.qty} uds</span>
+                      <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${bs.qty === 0 ? 'bg-rose-100 text-rose-700' : bs.qty <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}">${bs.qty} uds</span>
                       <div class="mt-1 text-xs text-slate-500">${bs.aisle}</div>
                       ${bs.qty === 0 && donor ? `<button onclick="quickTransfer('${donor.b.id}','${bs.b.id}','${p.id}','${p.name.replace(/'/g, '')}')" class="mt-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Pedir a ${donor.b.name.replace('Farmacia ','')}</button>` : ''}
                     </td>
                   `).join('')}
+                  <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <button type="button" onclick="openProductModal('${p.id}')" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100">✏️ Editar</button>
+                    <button type="button" onclick="deleteProduct('${p.id}')" class="ml-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">🗑️ Eliminar</button>
+                  </td>
                 </tr>
               `;
             }).join('')}
@@ -1520,6 +1566,18 @@
       const iq = (state.invQuery || '').trim().toLowerCase();
       const idp = state.invDept || 'ALL';
       const depts = [...new Set(PRODUCTS.map(p => p.dept).filter(Boolean))].sort();
+
+      const matchedProds = PRODUCTS.filter(p => {
+        if (idp !== 'ALL' && p.dept !== idp) return false;
+        if (iq && !p.name.toLowerCase().includes(iq) && !p.active.toLowerCase().includes(iq) && !(p.sku && p.sku.toLowerCase().includes(iq)) && !(p.barcode && p.barcode.toLowerCase().includes(iq))) return false;
+        return true;
+      });
+      const perPage = 50;
+      const totalProdPages = Math.max(1, Math.ceil(matchedProds.length / perPage));
+      if (state.invProdPage > totalProdPages) state.invProdPage = totalProdPages;
+      const prodStart = state.invProdShowAll ? 0 : (state.invProdPage - 1) * perPage;
+      const visibleProds = state.invProdShowAll ? matchedProds : matchedProds.slice(prodStart, prodStart + perPage);
+
       const allFilteredLots = LOTS.filter(l => {
         if ((state.globalBranch !== 'ALL' && l.branchId !== state.globalBranch) || l.qty <= 0) return false;
         const p = PRODUCTS.find(x => x.id === l.productId);
@@ -1528,18 +1586,85 @@
         if (iq && !p.name.toLowerCase().includes(iq) && !p.active.toLowerCase().includes(iq) && !l.lot.toLowerCase().includes(iq) && !(p.sku && p.sku.toLowerCase().includes(iq))) return false;
         return true;
       }).sort((a,b)=>a.expiry.localeCompare(b.expiry));
-      const fLots = allFilteredLots.slice(0, 100);
+      const fLots = state.invLotShowAll ? allFilteredLots : allFilteredLots.slice(0, 100);
+
       container.innerHTML = `
         <div class="space-y-6">
           <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 class="font-bold text-slate-900">💊 Control de Lotes y Vencimientos (FEFO) <span class="ml-1 text-xs font-normal text-slate-500">(${fLots.length} de ${allFilteredLots.length} lotes)</span></h3>
+              <div>
+                <h3 class="font-bold text-slate-900">📦 Catálogo de Productos en las 3 Farmacias <span class="ml-1 text-xs font-normal text-slate-500">(${matchedProds.length === 0 ? 0 : prodStart + 1}–${prodStart + visibleProds.length} de ${matchedProds.length})</span></h3>
+                <p class="text-xs text-slate-500">Visualiza existencias por farmacia y agrega, edita o elimina productos</p>
+              </div>
               <div class="flex flex-wrap items-center gap-2">
-                <input id="inv-search-input" type="text" value="${state.invQuery || ''}" oninput="state.invQuery=this.value; renderInventory(document.getElementById('main-content')); setTimeout(()=>{const el=document.getElementById('inv-search-input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}},0);" placeholder="Buscar medicamento, lote o SKU..." class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none">
-                <select onchange="state.invDept=this.value; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
+                <input id="inv-search-input" type="text" value="${state.invQuery || ''}" oninput="state.invQuery=this.value; state.invProdPage=1; renderInventory(document.getElementById('main-content')); setTimeout(()=>{const el=document.getElementById('inv-search-input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}},0);" placeholder="Buscar medicamento, lote o SKU..." class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none">
+                <select onchange="state.invDept=this.value; state.invProdPage=1; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
                   <option value="ALL">Todos los departamentos</option>
                   ${depts.map(d => `<option value="${d}" ${idp===d?'selected':''}>${d}</option>`).join('')}
                 </select>
+                <button type="button" onclick="openProductModal(null)" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">➕ Agregar Producto</button>
+              </div>
+            </div>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <span>Mostrando <b>${matchedProds.length === 0 ? 0 : prodStart + 1}–${prodStart + visibleProds.length}</b> de <b>${matchedProds.length}</b> productos</span>
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${!state.invProdShowAll && totalProdPages > 1 ? `
+                  <button type="button" ${state.invProdPage<=1?'disabled':''} onclick="state.invProdPage--; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">← Anterior</button>
+                  <span class="px-2 font-semibold">Pág. ${state.invProdPage}/${totalProdPages}</span>
+                  <button type="button" ${state.invProdPage>=totalProdPages?'disabled':''} onclick="state.invProdPage++; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">Siguiente →</button>
+                ` : ''}
+                <button type="button" onclick="state.invProdShowAll=!state.invProdShowAll; state.invProdPage=1; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 hover:bg-indigo-100">
+                  ${state.invProdShowAll ? 'Paginar (50 por pág.)' : `Ver todos (${matchedProds.length})`}
+                </button>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2.5">SKU / Medicamento</th>
+                    <th class="px-3 py-2.5">Precio</th>
+                    ${BRANCHES.map(b => `<th class="px-3 py-2.5">${b.name}</th>`).join('')}
+                    <th class="px-3 py-2.5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  ${visibleProds.map(p => {
+                    const stocks = BRANCHES.map(b => ({
+                      b,
+                      qty: LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0).reduce((s,l)=>s+l.qty, 0)
+                    }));
+                    return `
+                      <tr class="hover:bg-slate-50">
+                        <td class="px-3 py-2.5">
+                          <div class="font-bold text-slate-900">${p.name} <span class="ml-1 font-mono text-[11px] font-normal text-slate-400">${p.sku || p.id}</span></div>
+                          <div class="text-xs text-slate-500">${p.active} · ${p.pres}${p.dept ? ` · ${p.dept}` : ''}</div>
+                        </td>
+                        <td class="px-3 py-2.5 font-bold text-blue-700 whitespace-nowrap">${fmt(p.price)}</td>
+                        ${stocks.map(s => `
+                          <td class="px-3 py-2.5">
+                            <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${s.qty === 0 ? 'bg-rose-100 text-rose-700' : s.qty <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}">${s.qty} uds</span>
+                          </td>
+                        `).join('')}
+                        <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                          <button type="button" onclick="openProductModal('${p.id}')" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100">✏️ Editar</button>
+                          <button type="button" onclick="deleteProduct('${p.id}')" class="ml-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">🗑️ Eliminar</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="font-bold text-slate-900">💊 Control de Lotes y Vencimientos (FEFO) <span class="ml-1 text-xs font-normal text-slate-500">(${fLots.length} de ${allFilteredLots.length} lotes)</span></h3>
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="state.invLotShowAll=!state.invLotShowAll; renderInventory(document.getElementById('main-content'))" class="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">
+                  ${state.invLotShowAll ? 'Mostrar primeros 100' : `Ver todos los lotes (${allFilteredLots.length})`}
+                </button>
                 ${state.highlightProductId ? `<button type="button" onclick="state.highlightProductId=null; state.highlightBranchId=null; renderApp()" class="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200">Quitar resaltado</button>` : ''}
               </div>
             </div>
@@ -1963,7 +2088,7 @@
                   ` : expiring.map(x => {
                     const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
                     return `
-                      <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-rose-50/60" title="Clic para ver en Inventario">
+                      <tr onclick="openAlertInInventory('${x.product.id}', '${x.branch.id}')" class="cursor-pointer hover:bg-rose-50/60" title="Clic para ver en Inventario">
                         <td class="px-4 py-2.5 font-bold text-slate-900 underline decoration-rose-300">${x.product.name}</td>
                         <td class="px-4 py-2.5 text-slate-700">${x.branch.name}</td>
                         <td class="px-4 py-2.5 font-mono text-slate-600">${x.lot.lot}</td>
@@ -1996,7 +2121,7 @@
                   ` : lowStock.map(x => {
                     const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
                     return `
-                      <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
+                      <tr onclick="openAlertInInventory('${x.product.id}', '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
                         <td class="px-4 py-2.5 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
                         <td class="px-4 py-2.5 text-slate-700">${x.branch.name}</td>
                         <td class="px-4 py-2.5 text-right font-bold text-slate-900">${x.totalQty} uds</td>
@@ -2036,6 +2161,255 @@
       else if (state.tab === 'payroll') renderPayroll(content);
       else if (state.tab === 'roles') renderRolesAndUsers(content);
       else if (state.tab === 'alerts') renderAlertsView(content);
+      renderProductModal();
+    }
+
+    function openProductModal(prodId) {
+      if (!prodId) {
+        const nextNum = PRODUCTS.length + 1;
+        state.prodModal = {
+          mode: 'ADD',
+          id: 'MED-' + String(nextNum).padStart(4, '0') + '-' + String(Date.now()).slice(-3),
+          sku: 'MED-' + String(nextNum).padStart(4, '0'),
+          barcode: '746' + String(Date.now()).slice(-10),
+          name: '',
+          active: '',
+          pres: 'Caja x 30 tabletas',
+          dept: 'Analgésicos y Antiinflamatorios',
+          lab: '',
+          rx: 'No',
+          tax: 0,
+          cost: 0,
+          price: 0,
+          stockS1: 20,
+          stockS2: 15,
+          stockS3: 15,
+          lot: 'LT-' + String(Date.now()).slice(-6),
+          expiry: '2028-12-31'
+        };
+      } else {
+        const p = PRODUCTS.find(x => x.id === prodId);
+        if (!p) return;
+        const getBranchQty = (bid) => LOTS.filter(l => l.branchId === bid && l.productId === p.id && l.qty > 0).reduce((s, l) => s + l.qty, 0);
+        const firstLot = LOTS.find(l => l.productId === p.id) || {};
+        state.prodModal = {
+          mode: 'EDIT',
+          id: p.id,
+          sku: p.sku || p.id,
+          barcode: p.barcode || '',
+          name: p.name || '',
+          active: p.active || '',
+          pres: p.pres || '',
+          dept: p.dept || '',
+          lab: p.lab || '',
+          rx: p.rx || 'No',
+          tax: p.tax || 0,
+          cost: p.cost || 0,
+          price: p.price || 0,
+          stockS1: getBranchQty('SUC-01'),
+          stockS2: getBranchQty('SUC-02'),
+          stockS3: getBranchQty('SUC-03'),
+          lot: firstLot.lot || 'LT-001',
+          expiry: firstLot.expiry || '2028-12-31'
+        };
+      }
+      renderProductModal();
+    }
+
+    function saveProductModal(e) {
+      e.preventDefault();
+      const f = e.target;
+      const m = state.prodModal;
+      if (!m) return;
+
+      const prodData = {
+        id: m.id,
+        sku: f.sku.value.trim() || m.id,
+        barcode: f.barcode.value.trim(),
+        name: f.name.value.trim(),
+        active: f.active.value.trim() || 'Genérico',
+        conc: '',
+        form: '',
+        pres: f.pres.value.trim() || 'Unidad',
+        lab: f.lab.value.trim() || 'Varios',
+        dept: f.dept.value.trim() || 'General',
+        rx: f.rx.value,
+        reg: '',
+        tax: Number(f.tax.value) || 0,
+        cost: Math.max(0, Number(f.cost.value) || 0),
+        price: Math.max(0, Number(f.price.value) || 0),
+        minStock: 5
+      };
+
+      const branchQtys = {
+        'SUC-01': Math.max(0, parseInt(f.stockS1.value, 10) || 0),
+        'SUC-02': Math.max(0, parseInt(f.stockS2.value, 10) || 0),
+        'SUC-03': Math.max(0, parseInt(f.stockS3.value, 10) || 0)
+      };
+      const lotCode = f.lot.value.trim() || 'LT-001';
+      const expiry = f.expiry.value || '2028-12-31';
+
+      if (m.mode === 'ADD') {
+        PRODUCTS.unshift(prodData);
+        BRANCHES.forEach((b, idx) => {
+          LOTS.push({
+            id: 'L-' + Date.now() + '-' + idx,
+            productId: prodData.id,
+            branchId: b.id,
+            lot: idx === 0 ? lotCode : lotCode + '-' + b.id.slice(-1),
+            expiry,
+            qty: branchQtys[b.id],
+            aisle: 'Pasillo-1'
+          });
+        });
+      } else {
+        const idx = PRODUCTS.findIndex(x => x.id === m.id);
+        if (idx >= 0) PRODUCTS[idx] = { ...PRODUCTS[idx], ...prodData };
+        BRANCHES.forEach((b, bIdx) => {
+          const branchLots = LOTS.filter(l => l.branchId === b.id && l.productId === m.id);
+          if (branchLots.length > 0) {
+            branchLots[0].qty = branchQtys[b.id];
+            branchLots[0].lot = bIdx === 0 ? lotCode : branchLots[0].lot;
+            branchLots[0].expiry = expiry;
+            for (let i = 1; i < branchLots.length; i++) branchLots[i].qty = 0;
+          } else {
+            LOTS.push({
+              id: 'L-' + Date.now() + '-' + bIdx,
+              productId: m.id,
+              branchId: b.id,
+              lot: bIdx === 0 ? lotCode : lotCode + '-' + b.id.slice(-1),
+              expiry,
+              qty: branchQtys[b.id],
+              aisle: 'Pasillo-1'
+            });
+          }
+        });
+      }
+
+      saveCatalogToStorage();
+      state.prodModal = null;
+      renderApp();
+    }
+
+    function deleteProduct(prodId) {
+      const p = PRODUCTS.find(x => x.id === prodId);
+      if (!p) return;
+      if (!confirm(`¿Seguro que desea eliminar "${p.name}" de las 3 farmacias?`)) return;
+      const idx = PRODUCTS.findIndex(x => x.id === prodId);
+      if (idx >= 0) PRODUCTS.splice(idx, 1);
+      LOTS = LOTS.filter(l => l.productId !== prodId);
+      saveCatalogToStorage();
+      renderApp();
+    }
+
+    function renderProductModal() {
+      let root = document.getElementById('prod-modal-root');
+      if (!root) {
+        root = document.createElement('div');
+        root.id = 'prod-modal-root';
+        document.body.appendChild(root);
+      }
+      const m = state.prodModal;
+      if (!m) { root.innerHTML = ''; return; }
+      const depts = [...new Set(PRODUCTS.map(p => p.dept).filter(Boolean))].sort();
+      root.innerHTML = `
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="mb-4 flex items-center justify-between border-b pb-3">
+              <h3 class="text-lg font-bold text-slate-900">${m.mode === 'ADD' ? '➕ Agregar Nuevo Producto' : '✏️ Editar Producto'}</h3>
+              <button type="button" onclick="state.prodModal=null; renderProductModal()" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+            </div>
+            <form onsubmit="saveProductModal(event)" class="space-y-4 text-sm">
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Nombre Comercial *</label>
+                  <input name="name" required value="${m.name.replace(/"/g, '&quot;')}" class="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Principio Activo</label>
+                  <input name="active" value="${m.active.replace(/"/g, '&quot;')}" class="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Presentación</label>
+                  <input name="pres" value="${m.pres.replace(/"/g, '&quot;')}" class="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Departamento</label>
+                  <input name="dept" list="dept-options" value="${m.dept.replace(/"/g, '&quot;')}" class="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none">
+                  <datalist id="dept-options">${depts.map(d => `<option value="${d}">`).join('')}</datalist>
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Laboratorio</label>
+                  <input name="lab" value="${m.lab.replace(/"/g, '&quot;')}" class="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Código SKU / Barras</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <input name="sku" value="${m.sku}" placeholder="SKU" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs">
+                    <input name="barcode" value="${m.barcode}" placeholder="EAN-13" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs">
+                  </div>
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Precio Venta (RD$) *</label>
+                  <input name="price" type="number" step="0.01" min="0" required value="${m.price}" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-bold text-blue-800">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Costo Unitario (RD$)</label>
+                  <input name="cost" type="number" step="0.01" min="0" value="${m.cost}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">ITBIS</label>
+                  <select name="tax" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                    <option value="0" ${m.tax==0?'selected':''}>Exento (0%)</option>
+                    <option value="18" ${m.tax==18?'selected':''}>Gravado (18%)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-700">Receta Médica</label>
+                  <select name="rx" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                    <option value="No" ${m.rx==='No'?'selected':''}>No requiere</option>
+                    <option value="Sí" ${m.rx==='Sí'?'selected':''}>Sí (Con receta)</option>
+                    <option value="Controlado" ${m.rx==='Controlado'?'selected':''}>Controlado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div class="mb-2 text-xs font-extrabold uppercase text-slate-600">Existencia en las 3 Farmacias y Lote</div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label class="mb-1 block text-xs font-bold text-slate-700">Farmacia Osmairy</label>
+                    <input name="stockS1" type="number" min="0" value="${m.stockS1}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold">
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-bold text-slate-700">Farmacia Norte</label>
+                    <input name="stockS2" type="number" min="0" value="${m.stockS2}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold">
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-bold text-slate-700">Farmacia Sur</label>
+                    <input name="stockS3" type="number" min="0" value="${m.stockS3}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold">
+                  </div>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="mb-1 block text-xs font-bold text-slate-700">Lote Principal</label>
+                    <input name="lot" value="${m.lot}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs">
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-bold text-slate-700">Fecha Vencimiento</label>
+                    <input name="expiry" type="date" value="${m.expiry}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 border-t pt-3">
+                <button type="button" onclick="state.prodModal=null; renderProductModal()" class="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" class="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700">💾 Guardar Producto</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
     }
 
     document.getElementById('global-branch-selector').addEventListener('change', (e) => {
