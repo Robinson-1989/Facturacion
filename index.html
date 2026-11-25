@@ -843,44 +843,44 @@
               <!-- CABECERA DUAL -->
               <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
                 <!-- CLIENTE + VENDEDOR -->
-                <div class="flex flex-col gap-2.5 xl:col-span-7">
-                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3.5 pb-3 pt-2">
+                <div class="flex min-w-0 flex-col gap-2.5 xl:col-span-7">
+                  <fieldset class="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 pb-3 pt-2">
                     <legend class="px-1.5 text-sm font-bold text-slate-800">Información del Cliente</legend>
-                    <div class="space-y-2.5 text-sm">
-                      <div class="flex items-center gap-2">
-                        <input type="text" readonly value="${client.code}" data-tip="Código único del cliente seleccionado." class="w-14 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-center font-bold text-slate-800">
-                        <select onchange="posSelectClient(this.value)" data-tip="Selecciona un cliente registrado para autocompletar su RNC, teléfono, dirección y descuento." class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-bold text-slate-900">
+                    <div class="space-y-2 text-[13px]">
+                      <div class="flex min-w-0 items-center gap-1.5">
+                        <input type="text" readonly value="${client.code}" data-tip="Código único del cliente seleccionado." class="w-12 shrink-0 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-center font-bold text-slate-800">
+                        <select onchange="posSelectClient(this.value)" data-tip="Selecciona un cliente registrado para autocompletar su RNC, teléfono, dirección y descuento." class="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-bold text-slate-900">
                           ${CLIENTS.map(c => `<option value="${c.id}" ${c.id===client.id?'selected':''}>${c.name} ${c.ars ? '('+c.ars+')' : ''}</option>`).join('')}
                         </select>
-                        <button type="button" onclick="state.pos.modal='NEW_CLIENT'; renderPOS(document.getElementById('main-content'))" data-tip="Registrar un nuevo cliente rápido con RNC, teléfono y seguro ARS." class="rounded border border-slate-300 bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-50">...</button>
+                        <button type="button" onclick="state.pos.modal='NEW_CLIENT'; renderPOS(document.getElementById('main-content'))" data-tip="Registrar un nuevo cliente rápido con RNC, teléfono y seguro ARS." class="shrink-0 rounded border border-slate-300 bg-slate-100 px-2.5 py-1.5 font-bold text-slate-700 hover:bg-blue-50">...</button>
                       </div>
-                      <input type="text" value="${state.pos.address}" oninput="state.pos.address=this.value" data-tip="Dirección o referencia del cliente (se usa también para entregas a domicilio)." placeholder="Dirección o referencia del cliente..." class="w-full rounded border border-slate-300 px-3 py-1.5 text-slate-800">
+                      <input type="text" value="${state.pos.address}" oninput="state.pos.address=this.value" data-tip="Dirección o referencia del cliente (se usa también para entregas a domicilio)." placeholder="Dirección o referencia del cliente..." class="w-full min-w-0 rounded border border-slate-300 px-2.5 py-1.5 text-slate-800">
                       <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div class="flex items-center gap-2">
-                          <label class="w-28 shrink-0 font-bold text-slate-700">RNC/Cédula</label>
-                          <input type="text" value="${state.pos.rnc}" data-tip="Al ingresar 9 o más dígitos, cambia automáticamente el comprobante a NCF B01 (Crédito Fiscal)." oninput="state.pos.rnc=this.value; if(this.value.replace(/\\D/g,'').length>=9 && state.pos.ncfType==='B02'){state.pos.ncfType='B01'; renderPOS(document.getElementById('main-content'));}" class="w-full rounded border border-slate-300 px-2.5 py-1.5">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <label class="w-24 shrink-0 font-bold text-slate-700">RNC/Cédula</label>
+                          <input type="text" value="${state.pos.rnc}" data-tip="Al ingresar 9 o más dígitos, cambia automáticamente el comprobante a NCF B01 (Crédito Fiscal)." oninput="state.pos.rnc=this.value; if(this.value.replace(/\\D/g,'').length>=9 && state.pos.ncfType==='B02'){state.pos.ncfType='B01'; renderPOS(document.getElementById('main-content'));}" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1.5">
                         </div>
-                        <div class="flex items-center gap-2">
-                          <label class="w-28 shrink-0 font-bold ${state.pos.invoiceType==='SEGURO'?'text-blue-700':'text-slate-700'}">Autorización</label>
-                          <input type="text" value="${state.pos.authNo}" data-tip="Número de autorización emitido por la ARS / Seguro Médico." oninput="state.pos.authNo=this.value" class="w-full rounded border ${state.pos.invoiceType==='SEGURO'?'border-blue-500 bg-blue-50/40':'border-slate-300'} px-2.5 py-1.5">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <label class="w-24 shrink-0 font-bold ${state.pos.invoiceType==='SEGURO'?'text-blue-700':'text-slate-700'}">Autorización</label>
+                          <input type="text" value="${state.pos.authNo}" data-tip="Número de autorización emitido por la ARS / Seguro Médico." oninput="state.pos.authNo=this.value" class="min-w-0 flex-1 rounded border ${state.pos.invoiceType==='SEGURO'?'border-blue-500 bg-blue-50/40':'border-slate-300'} px-2 py-1.5">
                         </div>
-                        <div class="flex items-center gap-2">
-                          <label class="w-28 shrink-0 font-bold text-slate-700"># Receta Ctrl:</label>
-                          <input type="text" value="${state.pos.rxNo}" data-tip="Número de receta controlada requerida para medicamentos bajo prescripción especial." oninput="state.pos.rxNo=this.value" class="w-full rounded border border-slate-300 px-2.5 py-1.5">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <label class="w-24 shrink-0 font-bold text-slate-700"># Receta Ctrl:</label>
+                          <input type="text" value="${state.pos.rxNo}" data-tip="Número de receta controlada requerida para medicamentos bajo prescripción especial." oninput="state.pos.rxNo=this.value" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1.5">
                         </div>
-                        <div class="flex items-center gap-2">
-                          <label class="w-28 shrink-0 font-bold text-slate-700">Teléfono</label>
-                          <input type="text" value="${state.pos.phone}" data-tip="Teléfono de contacto o WhatsApp del cliente." oninput="state.pos.phone=this.value" class="w-full rounded border border-slate-300 px-2.5 py-1.5">
+                        <div class="flex min-w-0 items-center gap-1.5">
+                          <label class="w-24 shrink-0 font-bold text-slate-700">Teléfono</label>
+                          <input type="text" value="${state.pos.phone}" data-tip="Teléfono de contacto o WhatsApp del cliente." oninput="state.pos.phone=this.value" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1.5">
                         </div>
                       </div>
                     </div>
                   </fieldset>
 
-                  <fieldset class="rounded-lg border border-slate-300 bg-white px-3.5 pb-2.5 pt-1.5">
+                  <fieldset class="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 pb-2.5 pt-1.5">
                     <legend class="px-1.5 text-sm font-bold text-slate-800">Vendedor:</legend>
-                    <div class="flex items-center gap-2 text-sm">
-                      <span class="w-12 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-center font-bold">1</span>
-                      <select onchange="state.pos.seller=this.value" data-tip="Empleado o vendedor que atendió al cliente (para comisiones)." class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold">
+                    <div class="flex min-w-0 items-center gap-2 text-[13px]">
+                      <span class="w-12 shrink-0 rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-center font-bold">1</span>
+                      <select onchange="state.pos.seller=this.value" data-tip="Empleado o vendedor que atendió al cliente (para comisiones)." class="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold">
                         <option value="COMPAÑÍA" ${state.pos.seller==='COMPAÑÍA'?'selected':''}>COMPAÑÍA</option>
                         ${branchEmps.map(e => `<option value="${e.name.toUpperCase()}" ${state.pos.seller===e.name.toUpperCase()?'selected':''}>${e.name.toUpperCase()}</option>`).join('')}
                       </select>
@@ -889,53 +889,53 @@
                 </div>
 
                 <!-- INFORMACIÓN DE LA FACTURA -->
-                <fieldset class="rounded-lg border border-slate-300 bg-white px-3.5 pb-3 pt-2 xl:col-span-5">
+                <fieldset class="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 pb-3 pt-2 xl:col-span-5">
                   <legend class="px-1.5 text-sm font-bold text-slate-800">Información de la Factura</legend>
-                  <div class="space-y-2 text-sm">
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Número:</label>
-                      <div data-tip="Número correlativo de factura asignado automáticamente por sucursal." class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-center font-mono font-bold text-blue-800">${previewNo}</div>
+                  <div class="space-y-1.5 text-[13px]">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Número:</label>
+                      <div data-tip="Número correlativo de factura asignado automáticamente por sucursal." class="min-w-0 flex-1 truncate rounded border border-slate-200 bg-slate-50 px-2 py-1 text-center font-mono font-bold text-blue-800">${previewNo}</div>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Fecha:</label>
-                      <div class="grid flex-1 grid-cols-2 gap-1.5">
-                        <input type="text" readonly value="${liveDate}" class="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-semibold">
-                        <input type="text" readonly value="${liveTime}" class="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-center font-semibold">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Fecha:</label>
+                      <div class="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+                        <input type="text" readonly value="${liveDate}" class="min-w-0 w-full rounded border border-slate-300 bg-slate-50 px-1.5 py-1 text-center text-xs font-semibold">
+                        <input type="text" readonly value="${liveTime}" class="min-w-0 w-full rounded border border-slate-300 bg-slate-50 px-1.5 py-1 text-center text-xs font-semibold">
                       </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Tipo:</label>
-                      <select data-tip="Define la modalidad de la factura: Contado, Crédito, Seguro Médico o Domicilio." onchange="state.pos.invoiceType=this.value; if(this.value==='SEGURO')state.paymentMethod='SEGURO_MEDICO'; renderPOS(document.getElementById('main-content'))" class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1 font-bold">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Tipo:</label>
+                      <select data-tip="Define la modalidad de la factura: Contado, Crédito, Seguro Médico o Domicilio." onchange="state.pos.invoiceType=this.value; if(this.value==='SEGURO')state.paymentMethod='SEGURO_MEDICO'; renderPOS(document.getElementById('main-content'))" class="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-bold">
                         <option value="CONTADO" ${state.pos.invoiceType==='CONTADO'?'selected':''}>CONTADO</option>
                         <option value="CREDITO" ${state.pos.invoiceType==='CREDITO'?'selected':''}>CRÉDITO</option>
                         <option value="SEGURO" ${state.pos.invoiceType==='SEGURO'?'selected':''}>SEGURO MÉDICO</option>
                         <option value="DOMICILIO" ${state.pos.invoiceType==='DOMICILIO'?'selected':''}>DOMICILIO</option>
                       </select>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Conduce:</label>
-                      <input type="text" value="${state.pos.conduce}" data-tip="Número de conduce o nota de entrega (opcional)." oninput="state.pos.conduce=this.value" class="flex-1 rounded border border-slate-300 px-2.5 py-1">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Conduce:</label>
+                      <input type="text" value="${state.pos.conduce}" data-tip="Número de conduce o nota de entrega (opcional)." oninput="state.pos.conduce=this.value" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1">
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Orden No:</label>
-                      <input type="text" value="${state.pos.orderNo}" data-tip="Número de orden de compra o referencia interna (opcional)." oninput="state.pos.orderNo=this.value" class="flex-1 rounded border border-slate-300 px-2.5 py-1">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Orden No:</label>
+                      <input type="text" value="${state.pos.orderNo}" data-tip="Número de orden de compra o referencia interna (opcional)." oninput="state.pos.orderNo=this.value" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1">
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">Almacén:</label>
-                      <input type="text" readonly value="${branch.name.toUpperCase()}" data-tip="Sucursal activa desde donde se opera la caja." class="flex-1 rounded border border-slate-200 bg-slate-100 px-2.5 py-1 font-bold text-slate-800">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">Almacén:</label>
+                      <input type="text" readonly value="${branch.name.toUpperCase()}" data-tip="Sucursal activa desde donde se opera la caja." class="min-w-0 flex-1 rounded border border-slate-200 bg-slate-100 px-2 py-1 font-bold text-slate-800">
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">NCF Tipo:</label>
-                      <select data-tip="Tipo de Comprobante Fiscal (DGII): B02 Consumidor Final, B01 Crédito Fiscal, B14 Especial, B15 Gubernamental." onchange="state.pos.ncfType=this.value; renderPOS(document.getElementById('main-content'))" class="flex-1 rounded border border-slate-300 bg-white px-2.5 py-1 font-bold">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">NCF Tipo:</label>
+                      <select data-tip="Tipo de Comprobante Fiscal (DGII): B02 Consumidor Final, B01 Crédito Fiscal, B14 Especial, B15 Gubernamental." onchange="state.pos.ncfType=this.value; renderPOS(document.getElementById('main-content'))" class="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1 font-bold">
                         <option value="B02" ${state.pos.ncfType==='B02'?'selected':''}>CONSUMIDOR FINAL (B02)</option>
                         <option value="B01" ${state.pos.ncfType==='B01'?'selected':''}>CRÉDITO FISCAL (B01)</option>
                         <option value="B14" ${state.pos.ncfType==='B14'?'selected':''}>RÉGIMEN ESPECIAL (B14)</option>
                         <option value="B15" ${state.pos.ncfType==='B15'?'selected':''}>GUBERNAMENTAL (B15)</option>
                       </select>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <label class="w-24 shrink-0 text-right font-bold text-slate-700">NCF:</label>
-                      <div data-tip="Secuencia NCF generada automáticamente según el tipo seleccionado." class="flex-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-center font-mono font-bold text-blue-800">${previewNcf}</div>
+                    <div class="flex min-w-0 items-center gap-2">
+                      <label class="w-20 shrink-0 text-right font-bold text-slate-700">NCF:</label>
+                      <div data-tip="Secuencia NCF generada automáticamente según el tipo seleccionado." class="min-w-0 flex-1 truncate rounded border border-slate-200 bg-slate-50 px-2 py-1 text-center font-mono font-bold text-blue-800">${previewNcf}</div>
                     </div>
                   </div>
                 </fieldset>
