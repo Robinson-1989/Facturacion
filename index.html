@@ -1900,14 +1900,15 @@
 
       if (state.expiryAlertDismissed) {
         host.innerHTML = `
-          <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm">
-            <span class="flex items-center gap-2">
-              <span>🔔 Alertas de inventario ocultas:</span>
-              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-100 px-2 py-0.5 text-rose-800">${expiring.length} por vencer (≤ 5d)</span>` : ''}
-              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/95 px-4 py-2.5 text-xs font-bold text-slate-800 shadow-sm">
+            <span class="flex flex-wrap items-center gap-2">
+              <span>🔔 Centro de Alertas de Almacén:</span>
+              ${expiring.length > 0 ? `<span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-rose-800">${expiring.length} por vencer (≤ 5d)</span>` : ''}
+              ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-200 px-2.5 py-0.5 text-amber-900">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
             </span>
-            <button type="button" onclick="state.expiryAlertDismissed=false; renderExpiryAlertBanner()" class="rounded-lg bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">
-              Mostrar Alertas
+            <button type="button" onclick="state.expiryAlertDismissed=false; renderExpiryAlertBanner()" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700">
+              <span>Mostrar Alertas</span>
+              <span>▾</span>
             </button>
           </div>
         `;
@@ -1915,56 +1916,91 @@
       }
 
       host.innerHTML = `
-        <div class="space-y-3 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/60 to-amber-50 px-4 py-3 shadow-sm">
-          <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="relative rounded-xl border border-amber-300 bg-amber-50/95 shadow-sm">
+          <!-- CABECERA DEL DESPLEGABLE -->
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
             <div class="flex flex-wrap items-center gap-2 text-sm font-extrabold text-slate-900">
               <span>🔔 Centro de Alertas de Almacén</span>
               ${expiring.length > 0 ? `<span class="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs text-white">${expiring.length} por vencer (≤ 5 días)</span>` : ''}
               ${lowStock.length > 0 ? `<span class="rounded-full bg-amber-600 px-2.5 py-0.5 text-xs text-white">${lowStock.length} stock bajo (≤ 5 uds)</span>` : ''}
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="state.tab='inventory'; renderApp()" class="rounded-lg bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">Ver Inventario</button>
-              <button type="button" onclick="state.expiryAlertDismissed=true; renderExpiryAlertBanner()" class="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50">Ocultar</button>
+              <button type="button" onclick="state.tab='inventory'; renderApp()" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">Ver Inventario</button>
+              <button type="button" onclick="state.expiryAlertDismissed=true; renderExpiryAlertBanner()" class="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                <span>Ocultar</span>
+                <span>▴</span>
+              </button>
             </div>
           </div>
 
-          ${expiring.length > 0 ? `
-            <div>
-              <p class="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-rose-800">⚠️ Vencimiento próximo (≤ 5 días)</p>
-              <div class="flex flex-wrap gap-2">
-                ${expiring.map(x => {
-                  const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
-                  return `
-                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800">
-                      <strong class="text-rose-700">${x.product.name}</strong>
-                      <span>· ${x.branch.name.replace('Farmacia ', '')}</span>
-                      <span class="font-mono text-slate-500">[${x.lot.lot}]</span>
-                      <span>(${x.lot.qty} uds)</span>
-                      <span class="rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-800">${badge} · ${x.lot.expiry}</span>
-                    </span>
-                  `;
-                }).join('')}
+          <!-- CUADRO DESPLEGABLE ORGANIZADO EN TABLAS -->
+          <div class="max-h-96 overflow-y-auto border-t border-amber-200 bg-white p-4 rounded-b-xl space-y-4">
+            ${expiring.length > 0 ? `
+              <div>
+                <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-rose-800">⚠️ Productos Próximos a Vencer (≤ 5 días)</h4>
+                <div class="overflow-x-auto rounded-lg border border-rose-200">
+                  <table class="w-full border-collapse text-left text-xs">
+                    <thead class="bg-rose-50 text-[11px] font-extrabold uppercase text-rose-900">
+                      <tr>
+                        <th class="border-b border-rose-200 px-3 py-2">Producto</th>
+                        <th class="border-b border-rose-200 px-3 py-2">Farmacia</th>
+                        <th class="border-b border-rose-200 px-3 py-2">Lote</th>
+                        <th class="border-b border-rose-200 px-3 py-2 text-right">Stock</th>
+                        <th class="border-b border-rose-200 px-3 py-2 text-center">Fecha Venc.</th>
+                        <th class="border-b border-rose-200 px-3 py-2 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-rose-100">
+                      ${expiring.map(x => {
+                        const badge = x.daysLeft < 0 ? 'VENCIDO' : x.daysLeft === 0 ? 'VENCE HOY' : `Vence en ${x.daysLeft} día(s)`;
+                        return `
+                          <tr class="hover:bg-rose-50/40">
+                            <td class="px-3 py-2 font-bold text-slate-900">${x.product.name}</td>
+                            <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
+                            <td class="px-3 py-2 font-mono text-slate-600">${x.lot.lot}</td>
+                            <td class="px-3 py-2 text-right font-bold text-slate-900">${x.lot.qty} uds</td>
+                            <td class="px-3 py-2 text-center font-mono text-slate-700">${x.lot.expiry}</td>
+                            <td class="px-3 py-2 text-center"><span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-800">${badge}</span></td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ` : ''}
+            ` : ''}
 
-          ${lowStock.length > 0 ? `
-            <div>
-              <p class="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock crítico en almacén (≤ 5 unidades)</p>
-              <div class="flex flex-wrap gap-2">
-                ${lowStock.map(x => {
-                  const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
-                  return `
-                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800">
-                      <strong class="text-amber-800">${x.product.name}</strong>
-                      <span>· ${x.branch.name.replace('Farmacia ', '')}</span>
-                      <span class="rounded ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-1.5 py-0.5 text-[11px] font-bold">${badge}</span>
-                    </span>
-                  `;
-                }).join('')}
+            ${lowStock.length > 0 ? `
+              <div>
+                <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock Crítico en Almacén (≤ 5 unidades)</h4>
+                <div class="overflow-x-auto rounded-lg border border-amber-200">
+                  <table class="w-full border-collapse text-left text-xs">
+                    <thead class="bg-amber-50 text-[11px] font-extrabold uppercase text-amber-900">
+                      <tr>
+                        <th class="border-b border-amber-200 px-3 py-2">Producto</th>
+                        <th class="border-b border-amber-200 px-3 py-2">Farmacia</th>
+                        <th class="border-b border-amber-200 px-3 py-2 text-right">Existencia</th>
+                        <th class="border-b border-amber-200 px-3 py-2 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-100">
+                      ${lowStock.map(x => {
+                        const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
+                        return `
+                          <tr class="hover:bg-amber-50/40">
+                            <td class="px-3 py-2 font-bold text-slate-900">${x.product.name}</td>
+                            <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
+                            <td class="px-3 py-2 text-right font-bold text-slate-900">${x.totalQty} uds</td>
+                            <td class="px-3 py-2 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-[11px] font-bold">${badge}</span></td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ` : ''}
+            ` : ''}
+          </div>
         </div>
       `;
     }
