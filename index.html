@@ -484,91 +484,10 @@
               <canvas id="chart-timeline" height="85"></canvas>
             </div>
           </div>
-
-          <!-- BUSCADOR GLOBAL DE DISPONIBILIDAD -->
-          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
-            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 class="text-base font-bold text-slate-900">🔍 Buscador Global de Disponibilidad (${PRODUCTS.length} Productos)</h3>
-                <p class="text-xs text-slate-500">Stock en tiempo real en las 3 farmacias · Con botones para agregar, editar y eliminar</p>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <input type="text" value="${state.searchQuery}" oninput="state.searchQuery=this.value; state.dashPage=1; renderDashboardTableOnly()" placeholder="Buscar medicamento, SKU o principio activo..." class="w-full md:w-72 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none">
-                <button type="button" onclick="openProductModal(null)" class="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">➕ Agregar Producto</button>
-              </div>
-            </div>
-            <div id="availability-table-wrap" class="overflow-x-auto"></div>
-          </div>
         </div>
       `;
 
-      renderDashboardTableOnly();
       initSimpleCharts(fSales, fPay);
-    }
-
-    function renderDashboardTableOnly() {
-      const wrap = document.getElementById('availability-table-wrap');
-      if (!wrap) return;
-      const q = state.searchQuery.trim().toLowerCase();
-      const matched = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q) || p.active.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)) || (p.barcode && p.barcode.toLowerCase().includes(q)));
-      const perPage = 50;
-      const totalPages = Math.max(1, Math.ceil(matched.length / perPage));
-      if (state.dashPage > totalPages) state.dashPage = totalPages;
-      const start = state.dashShowAll ? 0 : (state.dashPage - 1) * perPage;
-      const filteredProds = state.dashShowAll ? matched : matched.slice(start, start + perPage);
-
-      wrap.innerHTML = `
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <span>Mostrando <b>${matched.length === 0 ? 0 : start + 1}–${start + filteredProds.length}</b> de <b>${matched.length}</b> medicamentos en las 3 farmacias</span>
-          <div class="flex flex-wrap items-center gap-1.5">
-            ${!state.dashShowAll && totalPages > 1 ? `
-              <button type="button" ${state.dashPage<=1?'disabled':''} onclick="state.dashPage--; renderDashboardTableOnly()" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">← Anterior</button>
-              <span class="px-2 font-semibold">Pág. ${state.dashPage}/${totalPages}</span>
-              <button type="button" ${state.dashPage>=totalPages?'disabled':''} onclick="state.dashPage++; renderDashboardTableOnly()" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold hover:bg-slate-100 disabled:opacity-40">Siguiente →</button>
-            ` : ''}
-            <button type="button" onclick="state.dashShowAll=!state.dashShowAll; state.dashPage=1; renderDashboardTableOnly()" class="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 font-bold text-indigo-700 hover:bg-indigo-100">
-              ${state.dashShowAll ? 'Paginar (50 por pág.)' : `Ver todos (${matched.length})`}
-            </button>
-          </div>
-        </div>
-        <table class="w-full text-left text-sm">
-          <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th class="px-4 py-2.5">Medicamento</th>
-              ${BRANCHES.map(b => `<th class="px-4 py-2.5">${b.name}</th>`).join('')}
-              <th class="px-4 py-2.5 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${filteredProds.map(p => {
-              const branchStocks = BRANCHES.map(b => {
-                const bLots = LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0);
-                return { b, qty: bLots.reduce((s,l)=>s+l.qty,0), aisle: bLots[0]?.aisle || 'Sin stock' };
-              });
-              const donor = branchStocks.find(bs => bs.qty >= 10);
-              return `
-                <tr class="hover:bg-slate-50/80">
-                  <td class="px-4 py-3">
-                    <div class="font-bold text-slate-900">${p.name} <span class="ml-1 font-mono text-[11px] font-normal text-slate-400">${p.sku || p.id}</span></div>
-                    <div class="text-xs text-slate-500">${p.active} · ${p.pres} · <b class="text-slate-700">${fmt(p.price)}</b></div>
-                  </td>
-                  ${branchStocks.map(bs => `
-                    <td class="px-4 py-3">
-                      <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${bs.qty === 0 ? 'bg-rose-100 text-rose-700' : bs.qty <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}">${bs.qty} uds</span>
-                      <div class="mt-1 text-xs text-slate-500">${bs.aisle}</div>
-                      ${bs.qty === 0 && donor ? `<button onclick="quickTransfer('${donor.b.id}','${bs.b.id}','${p.id}','${p.name.replace(/'/g, '')}')" class="mt-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Pedir a ${donor.b.name.replace('Farmacia ','')}</button>` : ''}
-                    </td>
-                  `).join('')}
-                  <td class="px-4 py-3 text-right whitespace-nowrap">
-                    <button type="button" onclick="openProductModal('${p.id}')" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100">✏️ Editar</button>
-                    <button type="button" onclick="deleteProduct('${p.id}')" class="ml-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">🗑️ Eliminar</button>
-                  </td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      `;
     }
 
     function initSimpleCharts(fSales, fPay) {
@@ -1623,27 +1542,45 @@
                 <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
                   <tr>
                     <th class="px-3 py-2.5">SKU / Medicamento</th>
-                    <th class="px-3 py-2.5">Precio</th>
+                    <th class="px-3 py-2.5">Compra (Costo)</th>
+                    <th class="px-3 py-2.5">Venta</th>
                     ${BRANCHES.map(b => `<th class="px-3 py-2.5">${b.name}</th>`).join('')}
                     <th class="px-3 py-2.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y">
                   ${visibleProds.map(p => {
-                    const stocks = BRANCHES.map(b => ({
-                      b,
-                      qty: LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0).reduce((s,l)=>s+l.qty, 0)
-                    }));
+                    const stocks = BRANCHES.map(b => {
+                      const bLots = LOTS.filter(l => l.branchId === b.id && l.productId === p.id && l.qty > 0);
+                      return {
+                        b,
+                        qty: bLots.reduce((s,l)=>s+l.qty, 0),
+                        aisle: bLots[0]?.aisle || 'Sin stock'
+                      };
+                    });
+                    const donor = stocks.find(bs => bs.qty >= 10);
+                    const costVal = Number(p.cost || 0);
+                    const priceVal = Number(p.price || 0);
+                    const marginPct = costVal > 0 ? Math.round(((priceVal - costVal) / costVal) * 100) : 0;
                     return `
                       <tr class="hover:bg-slate-50">
                         <td class="px-3 py-2.5">
                           <div class="font-bold text-slate-900">${p.name} <span class="ml-1 font-mono text-[11px] font-normal text-slate-400">${p.sku || p.id}</span></div>
                           <div class="text-xs text-slate-500">${p.active} · ${p.pres}${p.dept ? ` · ${p.dept}` : ''}</div>
                         </td>
-                        <td class="px-3 py-2.5 font-bold text-blue-700 whitespace-nowrap">${fmt(p.price)}</td>
+                        <td class="px-3 py-2.5 whitespace-nowrap">
+                          <div class="font-bold text-slate-700">${fmt(costVal)}</div>
+                          <div class="text-[11px] text-slate-400">Costo unit.</div>
+                        </td>
+                        <td class="px-3 py-2.5 whitespace-nowrap">
+                          <div class="font-bold text-blue-700">${fmt(priceVal)}</div>
+                          ${costVal > 0 ? `<div class="text-[11px] font-semibold text-emerald-700">+${marginPct}% margen</div>` : ''}
+                        </td>
                         ${stocks.map(s => `
                           <td class="px-3 py-2.5">
                             <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${s.qty === 0 ? 'bg-rose-100 text-rose-700' : s.qty <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}">${s.qty} uds</span>
+                            <div class="mt-1 text-[11px] text-slate-500">${s.aisle}</div>
+                            ${s.qty === 0 && donor ? `<button onclick="quickTransfer('${donor.b.id}','${s.b.id}','${p.id}','${p.name.replace(/'/g, '')}')" class="mt-1 rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100">Pedir a ${donor.b.name.replace('Farmacia ','')}</button>` : ''}
                           </td>
                         `).join('')}
                         <td class="px-3 py-2.5 text-right whitespace-nowrap">
