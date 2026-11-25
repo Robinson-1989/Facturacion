@@ -155,7 +155,7 @@
         name: 'Administrador',
         color: 'bg-indigo-500 text-white',
         protected: true,
-        permissions: ['dashboard', 'pos', 'inventory', 'payroll', 'roles'],
+        permissions: ['dashboard', 'pos', 'inventory', 'payroll', 'roles', 'history'],
       },
       {
         id: 'ROL-FACT',
@@ -197,6 +197,43 @@
         localStorage.setItem('farma_products_v1', JSON.stringify(PRODUCTS));
         localStorage.setItem('farma_lots_v1', JSON.stringify(LOTS));
       } catch (e) { /* ignore storage quota errors */ }
+    }
+
+    let USER_HISTORY = (() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('farma_user_history_v1') || 'null');
+        if (Array.isArray(saved)) return saved;
+      } catch { /* ignore */ }
+      return [];
+    })();
+
+    function logUserAction(category, action, detail, branchIdOverride) {
+      const now = new Date();
+      const user = getActiveUser();
+      const role = getActiveRole();
+      const bid = branchIdOverride || state.globalBranch || user.branchId || 'ALL';
+      const bObj = BRANCHES.find(b => b.id === bid);
+      const branchName = bid === 'ALL' ? 'Todas las Sucursales' : (bObj ? bObj.name : bid);
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      USER_HISTORY.unshift({
+        id: 'HIS-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+        timestamp: now.toISOString(),
+        date: dateStr,
+        time: timeStr,
+        userId: user.id,
+        userName: user.name,
+        roleName: role.name,
+        branchId: bid,
+        branchName,
+        category,
+        action,
+        detail
+      });
+      if (USER_HISTORY.length > 1000) USER_HISTORY.length = 1000;
+      try { localStorage.setItem('farma_user_history_v1', JSON.stringify(USER_HISTORY)); } catch {}
     }
 
     let SALES = [
@@ -298,7 +335,11 @@
       invProdPage: 1,
       invProdShowAll: false,
       invLotShowAll: false,
-      prodModal: null
+      prodModal: null,
+      hisQuery: '',
+      hisUser: 'ALL',
+      hisCat: 'ALL',
+      hisDate: ''
     };
 
     const fmt = (n) => 'RD$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -336,6 +377,7 @@
         { id: 'inventory', label: 'Inventario & Traslados', icon: '💊' },
         { id: 'payroll', label: 'Nómina & Empleados', icon: '👥' },
         { id: 'roles', label: 'Roles y Usuarios', icon: '🔐' },
+        { id: 'history', label: 'Historial de Usuarios', icon: '🕒' },
       ].filter(item => perms.includes(item.id));
 
       navItems.push({ id: 'alerts', label: 'Alertas de Almacén', icon: '🔔', badge: totalAlerts });
@@ -726,6 +768,7 @@
       }
       s.status = 'ANULADA';
       s.voidReason = state.pos.voidReason || 'Anulación en POS';
+      logUserAction('Facturación', 'Anuló factura', `Factura ${s.id} (NCF: ${s.ncf || 'N/A'}) · Motivo: ${s.voidReason}`, s.branchId);
       state.pos.voidTargetId = null;
       state.pos.voidReason = '';
       state.pos.msg = `Factura ${s.id} anulada y stock restaurado.`;
@@ -1428,7 +1471,7 @@
           const take = Math.min(rem, l.qty);
           l.qty -= take;
           rem -= take;
-          cogs += take * l.cost;
+          cogs += take * (l.cost ?? p.cost ?? 0);
           lotDeductions.push({ lotId: l.id, qty: take });
           const lineTotal = take * item.unitPrice * (1 - (item.discountPct || 0) / 100);
           ticketLines.push({ name: p.name, qty: take, lot: `${deductBranch} · ${l.lot}`, total: lineTotal });
@@ -1456,6 +1499,8 @@
         deliveryStatus: state.pos.invoiceType === 'DOMICILIO' ? 'PENDIENTE' : undefined,
         deliveryAddress: state.pos.address
       });
+
+      logUserAction('Facturación', 'Emitió factura', `Factura ${id} (NCF: ${ncf}) · Cliente: ${client.name} · Total: ${fmt(totals.total)}`, branchId);
 
       state.lastTicket = { id, ncf, clientName: client.name, cashier: state.pos.cashier, total: totals.total, method: state.paymentMethod, lines: ticketLines };
       const shouldPrint = state.pos.autoPrint;
@@ -1644,6 +1689,7 @@
         LOTS.push({ id: Date.now(), branchId: t.to, productId: t.productId, lot: srcLot.lot + '-TR', expiry: srcLot.expiry, qty: t.qty, cost: srcLot.cost, aisle: 'Recepción' });
       }
       t.status = 'COMPLETADO';
+      logUserAction('Inventario', 'Aprobó traslado', `${t.productName} (${t.qty} uds) · ${t.from} → ${t.to}`, t.to);
       renderApp();
     }
 
@@ -1909,6 +1955,7 @@
       state.globalBranch = u.branchId;
       state.tab = r.permissions[0] || 'pos';
       state.isAuthenticated = true;
+      logUserAction('Sesión', 'Inicio de sesión', `Ingresó al sistema como ${u.name} (${r.name})`, u.branchId);
       renderApp();
     }
 
@@ -1924,6 +1971,7 @@
     }
 
     function logout() {
+      logUserAction('Sesión', 'Cierre de sesión', `Cerró sesión (${getActiveUser().name})`);
       destroyCharts();
       state.isAuthenticated = false;
       renderApp();
@@ -2097,8 +2145,98 @@
       else if (state.tab === 'inventory') renderInventory(content);
       else if (state.tab === 'payroll') renderPayroll(content);
       else if (state.tab === 'roles') renderRolesAndUsers(content);
+      else if (state.tab === 'history') renderUserHistory(content);
       else if (state.tab === 'alerts') renderAlertsView(content);
       renderProductModal();
+    }
+
+    function renderUserHistory(container) {
+      const hq = (state.hisQuery || '').trim().toLowerCase();
+      const hu = state.hisUser || 'ALL';
+      const hc = state.hisCat || 'ALL';
+      const hd = state.hisDate || '';
+
+      const filtered = USER_HISTORY.filter(h => {
+        if (hu !== 'ALL' && String(h.userId) !== String(hu)) return false;
+        if (hc !== 'ALL' && h.category !== hc) return false;
+        if (hd && h.date !== hd) return false;
+        if (hq && !h.action.toLowerCase().includes(hq) && !h.detail.toLowerCase().includes(hq) && !h.userName.toLowerCase().includes(hq) && !h.branchName.toLowerCase().includes(hq)) return false;
+        return true;
+      });
+
+      const catBadge = (c) => {
+        if (c === 'Facturación') return 'bg-blue-100 text-blue-800';
+        if (c === 'Inventario') return 'bg-emerald-100 text-emerald-800';
+        if (c === 'Sesión') return 'bg-indigo-100 text-indigo-800';
+        if (c === 'Nómina') return 'bg-amber-100 text-amber-800';
+        return 'bg-slate-100 text-slate-700';
+      };
+
+      const usersInHist = [...new Map(USER_HISTORY.map(h => [String(h.userId), h.userName])).entries()];
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">🕒 Historial de Movimientos de Usuarios <span class="ml-1 text-xs font-normal text-slate-500">(${filtered.length} registros)</span></h3>
+                <p class="text-xs text-slate-500">Auditoría en tiempo real de sesiones, ventas, anulaciones y cambios de inventario con fecha y hora</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <input id="his-search-input" type="text" value="${state.hisQuery || ''}" oninput="state.hisQuery=this.value; renderUserHistory(document.getElementById('main-content')); setTimeout(()=>{const el=document.getElementById('his-search-input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}},0);" placeholder="Buscar acción, detalle o usuario..." class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none">
+                <select onchange="state.hisUser=this.value; renderUserHistory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
+                  <option value="ALL">Todos los usuarios</option>
+                  ${usersInHist.map(([uid, uname]) => `<option value="${uid}" ${String(hu)===String(uid)?'selected':''}>${uname}</option>`).join('')}
+                </select>
+                <select onchange="state.hisCat=this.value; renderUserHistory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
+                  <option value="ALL">Todas las categorías</option>
+                  <option value="Sesión" ${hc==='Sesión'?'selected':''}>Sesión</option>
+                  <option value="Facturación" ${hc==='Facturación'?'selected':''}>Facturación</option>
+                  <option value="Inventario" ${hc==='Inventario'?'selected':''}>Inventario</option>
+                  <option value="Nómina" ${hc==='Nómina'?'selected':''}>Nómina</option>
+                </select>
+                <input type="date" value="${hd}" onchange="state.hisDate=this.value; renderUserHistory(document.getElementById('main-content'))" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
+                ${USER_HISTORY.length > 0 ? `<button type="button" onclick="if(confirm('¿Limpiar todo el historial de movimientos?')){USER_HISTORY=[]; localStorage.removeItem('farma_user_history_v1'); renderUserHistory(document.getElementById('main-content'));}" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100">🗑️ Limpiar</button>` : ''}
+              </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left text-sm">
+                <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="px-4 py-2.5">Fecha y Hora</th>
+                    <th class="px-4 py-2.5">Usuario</th>
+                    <th class="px-4 py-2.5">Sucursal</th>
+                    <th class="px-4 py-2.5">Categoría</th>
+                    <th class="px-4 py-2.5">Movimiento</th>
+                    <th class="px-4 py-2.5">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${filtered.length === 0 ? `
+                    <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No hay movimientos registrados con estos filtros todavía.</td></tr>
+                  ` : filtered.slice(0, 200).map(h => `
+                    <tr class="hover:bg-slate-50">
+                      <td class="px-4 py-2.5 whitespace-nowrap font-mono text-xs text-slate-700">
+                        <div class="font-bold text-slate-900">${h.date}</div>
+                        <div class="text-slate-500">${h.time}</div>
+                      </td>
+                      <td class="px-4 py-2.5 whitespace-nowrap">
+                        <div class="font-bold text-slate-900">${h.userName}</div>
+                        <div class="text-[11px] text-slate-500">${h.roleName}</div>
+                      </td>
+                      <td class="px-4 py-2.5 text-xs text-slate-700 whitespace-nowrap">${h.branchName}</td>
+                      <td class="px-4 py-2.5 whitespace-nowrap"><span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${catBadge(h.category)}">${h.category}</span></td>
+                      <td class="px-4 py-2.5 font-semibold text-slate-900 whitespace-nowrap">${h.action}</td>
+                      <td class="px-4 py-2.5 text-xs text-slate-600">${h.detail}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function openProductModal(prodId) {
@@ -2223,6 +2361,7 @@
         });
       }
 
+      logUserAction('Inventario', m.mode === 'ADD' ? 'Agregó producto' : 'Editó producto', `${prodData.name} (${prodData.sku}) · Compra: ${fmt(prodData.cost)} / Venta: ${fmt(prodData.price)} · Stock: Osmairy=${branchQtys['SUC-01']}, Norte=${branchQtys['SUC-02']}, Sur=${branchQtys['SUC-03']}`);
       saveCatalogToStorage();
       state.prodModal = null;
       renderApp();
@@ -2235,6 +2374,7 @@
       const idx = PRODUCTS.findIndex(x => x.id === prodId);
       if (idx >= 0) PRODUCTS.splice(idx, 1);
       LOTS = LOTS.filter(l => l.productId !== prodId);
+      logUserAction('Inventario', 'Eliminó producto', `${p.name} (${p.sku || p.id})`);
       saveCatalogToStorage();
       renderApp();
     }
