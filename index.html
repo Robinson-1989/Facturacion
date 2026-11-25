@@ -201,11 +201,11 @@
       { id: 402, branchId: 'SUC-02', productId: 4, lot: 'GLU-27B', expiry: '2027-07-18', qty: 52, cost: 5.4, aisle: 'Pasillo B-1' },
       { id: 403, branchId: 'SUC-03', productId: 4, lot: 'GLU-26X', expiry: '2026-11-26', qty: 9, cost: 5.4, aisle: 'Pasillo C-2' },
       { id: 501, branchId: 'SUC-01', productId: 5, lot: 'ZIT-27A', expiry: '2027-04-22', qty: 24, cost: 9.8, aisle: 'Pasillo A-1' },
-      { id: 502, branchId: 'SUC-02', productId: 5, lot: 'ZIT-27B', expiry: '2027-05-30', qty: 19, cost: 9.8, aisle: 'Pasillo A-3' },
+      { id: 502, branchId: 'SUC-02', productId: 5, lot: 'ZIT-27B', expiry: '2027-05-30', qty: 4, cost: 9.8, aisle: 'Pasillo A-3' },
       { id: 503, branchId: 'SUC-03', productId: 5, lot: 'ZIT-27C', expiry: '2027-09-14', qty: 31, cost: 9.8, aisle: 'Pasillo A-1' },
       { id: 601, branchId: 'SUC-01', productId: 6, lot: 'VIT-27A', expiry: '2027-10-15', qty: 50, cost: 4.1, aisle: 'Mostrador E-1' },
       { id: 602, branchId: 'SUC-02', productId: 6, lot: 'VIT-27B', expiry: '2027-08-20', qty: 28, cost: 4.1, aisle: 'Mostrador E-2' },
-      { id: 603, branchId: 'SUC-03', productId: 6, lot: 'VIT-27C', expiry: '2027-06-11', qty: 15, cost: 4.1, aisle: 'Mostrador E-1' },
+      { id: 603, branchId: 'SUC-03', productId: 6, lot: 'VIT-27C', expiry: '2027-06-11', qty: 5, cost: 4.1, aisle: 'Mostrador E-1' },
     ];
 
     let SALES = [
@@ -1983,36 +1983,36 @@
               </div>
             ` : ''}
 
-            ${lowStock.length > 0 ? `
-              <div>
-                <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock Crítico en Almacén (≤ 5 unidades)</h4>
-                <div class="overflow-x-auto rounded-lg border border-amber-200">
-                  <table class="w-full border-collapse text-left text-xs">
-                    <thead class="bg-amber-50 text-[11px] font-extrabold uppercase text-amber-900">
-                      <tr>
-                        <th class="border-b border-amber-200 px-3 py-2">Producto</th>
-                        <th class="border-b border-amber-200 px-3 py-2">Farmacia</th>
-                        <th class="border-b border-amber-200 px-3 py-2 text-right">Existencia</th>
-                        <th class="border-b border-amber-200 px-3 py-2 text-center">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-amber-100">
-                      ${lowStock.map(x => {
-                        const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
-                        return `
-                          <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
-                            <td class="px-3 py-2 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
-                            <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
-                            <td class="px-3 py-2 text-right font-bold text-slate-900">${x.totalQty} uds</td>
-                            <td class="px-3 py-2 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-[11px] font-bold">${badge}</span></td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
+            <div>
+              <h4 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-900">📦 Stock Crítico en Almacén (≤ 5 unidades)</h4>
+              <div class="overflow-x-auto rounded-lg border border-amber-200">
+                <table class="w-full border-collapse text-left text-xs">
+                  <thead class="bg-amber-50 text-[11px] font-extrabold uppercase text-amber-900">
+                    <tr>
+                      <th class="border-b border-amber-200 px-3 py-2">Producto</th>
+                      <th class="border-b border-amber-200 px-3 py-2">Farmacia</th>
+                      <th class="border-b border-amber-200 px-3 py-2 text-right">Existencia</th>
+                      <th class="border-b border-amber-200 px-3 py-2 text-center">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-amber-100">
+                    ${lowStock.length === 0 ? `
+                      <tr><td colspan="4" class="px-3 py-3 text-center text-slate-400 font-semibold">Todos los productos en inventario tienen más de 5 unidades.</td></tr>
+                    ` : lowStock.map(x => {
+                      const badge = x.totalQty === 0 ? 'AGOTADO (0 uds)' : `Solo quedan ${x.totalQty} uds`;
+                      return `
+                        <tr onclick="openAlertInInventory(${x.product.id}, '${x.branch.id}')" class="cursor-pointer hover:bg-amber-50/60" title="Clic para ver en Inventario">
+                          <td class="px-3 py-2 font-bold text-slate-900 underline decoration-amber-300">${x.product.name}</td>
+                          <td class="px-3 py-2 text-slate-700">${x.branch.name}</td>
+                          <td class="px-3 py-2 text-right font-bold text-slate-900">${x.totalQty} uds</td>
+                          <td class="px-3 py-2 text-center"><span class="rounded-full ${x.totalQty === 0 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900'} px-2.5 py-0.5 text-[11px] font-bold">${badge}</span></td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
               </div>
-            ` : ''}
+            </div>
           </div>
         </div>
       `;
